@@ -1,0 +1,16 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "analink"
+version = "0.1.0"
+description = "Ink Analyzer"
+readme = "README.md"
+authors = [
+    "StudioMalfinio <malfiniostudio@gmail.com>"
+]
+packages = [{include = "analink", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
