@@ -16,3 +16,4 @@ packages = [{include = "analink", from = "src"}]
 python = ">=3.10"
 ipykernel = "*"
 pydantic = "*"
+pytest = "*"
