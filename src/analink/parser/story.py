@@ -49,9 +49,7 @@ class Story(BaseModel):
 
         return available
 
-    def _evaluate_condition(
-        self, condition: Condition, container_id: int
-    ) -> bool:
+    def _evaluate_condition(self, condition: Condition, container_id: int) -> bool:
         """Evaluate any condition with optional container context"""
         container_state = self.get_container_state(container_id)
         return condition.evaluate(container_state, self.game_state, self.current_turn)

@@ -252,7 +252,7 @@ class TestContainerComputedField:
         Container.reset_id_counter()
 
     def test_item_id_is_computed_field(self):
-        container = Container()
+        _ = Container()
 
         assert hasattr(Container, "item_id")
         assert callable(getattr(Container, "item_id").fget)
