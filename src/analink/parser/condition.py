@@ -1,7 +1,9 @@
-from pydantic import BaseModel, model_validator
 from enum import Enum
-from typing import Union, Optional, Any
-from analink.parser.status import ContainerStatus, ContainerState
+from typing import Any, Optional, Union
+
+from pydantic import BaseModel, model_validator
+
+from analink.parser.status import ContainerState, ContainerStatus
 
 
 class ConditionType(Enum):
@@ -22,7 +24,7 @@ class UnaryCondition(BaseModel):
     """Single condition check - pure description of what to check"""
 
     condition_type: ConditionType
-    expected_value: Union[ContainerStatus, int, str, bool, dict[str, int]]
+    expected_value: Union[ContainerStatus, int, str, bool, dict[str, Union[str, int]]]
 
     @model_validator(mode="after")
     def validate_expected_value_type(self) -> "UnaryCondition":
@@ -89,12 +91,13 @@ class UnaryCondition(BaseModel):
             case ConditionType.SEEN_COUNT_GT:
                 if container_state is None:
                     return False
-                return container_state.seen_count > self.expected_value
+                # int, checked in model_validator
+                return container_state.seen_count > self.expected_value  # type: ignore
 
             case ConditionType.SEEN_COUNT_LT:
                 if container_state is None:
                     return False
-                return container_state.seen_count < self.expected_value
+                return container_state.seen_count < self.expected_value  # type: ignore
 
             case ConditionType.SEEN_COUNT_EQ:
                 if container_state is None:
@@ -104,26 +107,26 @@ class UnaryCondition(BaseModel):
             case ConditionType.VARIABLE_EQ:
                 if game_state is None:
                     return False
-                var_name = self.expected_value["variable"]
-                var_value = self.expected_value["value"]
+                var_name: str = self.expected_value["variable"]  # type: ignore[index, assignment]
+                var_value = self.expected_value["value"]  # type: ignore[index]
                 return game_state.get(var_name) == var_value
 
             case ConditionType.VARIABLE_GT:
                 if game_state is None:
                     return False
-                var_name = self.expected_value["variable"]
-                var_value = self.expected_value["value"]
+                var_name: str = self.expected_value["variable"]  # type: ignore[index, assignment, no-redef]
+                var_value = self.expected_value["value"]  # type: ignore[index]
                 return game_state.get(var_name, 0) > var_value
 
             case ConditionType.VARIABLE_LT:
                 if game_state is None:
                     return False
-                var_name = self.expected_value["variable"]
-                var_value = self.expected_value["value"]
+                var_name = self.expected_value["variable"]  # type: ignore[index, assignment]
+                var_value = self.expected_value["value"]  # type: ignore[index]
                 return game_state.get(var_name, 0) < var_value
 
             case ConditionType.TURN_GT:
-                return current_turn > self.expected_value
+                return current_turn > self.expected_value  # type: ignore
 
             case _:
                 return False

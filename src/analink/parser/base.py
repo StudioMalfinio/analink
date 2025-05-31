@@ -1,6 +1,7 @@
+from typing import ClassVar, Optional
+
 from pydantic import BaseModel, Field, PrivateAttr, computed_field
-from typing import Optional
-from typing import ClassVar
+
 from analink.parser.condition import Condition
 
 
@@ -17,7 +18,7 @@ class Container(BaseModel):
 
     _next_id: ClassVar[int] = 1
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def item_id(self) -> int:
         return self._id

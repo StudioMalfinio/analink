@@ -1,65 +1,67 @@
-from analink.parser.utils import count_leading_chars
-from enum import Enum
-from analink.parser.base import BaseObject
-from pydantic import Field
-from typing import Optional
 import re
+from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+from analink.parser.utils import count_leading_chars
+
 
 class ChoiceType(str, Enum):
     """Enum for choice types"""
+
     STICKY = "+"  # Reusable choices
     REGULAR = "*"  # Consumed after use
 
-class Choice(BaseObject):
+
+class Choice(BaseModel):
     """Represents a choice in the Ink script"""
+
     display_text: str = Field(..., description="The display text of the choice")
-    text_after_choice: Optional[str] = Field(None, description="The text displayed when choosen")
+    text_after_choice: Optional[str] = Field(
+        None, description="The text displayed when choosen"
+    )
     target: Optional[str] = Field(None, description="The target knot name")
-    condition: Optional[str] = Field(None, description="Condition for this choice to be available")
+    condition: Optional[str] = Field(
+        None, description="Condition for this choice to be available"
+    )
     line_number: int = Field(0, description="Line number in the source file")
-    sticky: bool = Field(False, description="Whether this choice is reusable (+ choices)")
-    
+    sticky: bool = Field(
+        False, description="Whether this choice is reusable (+ choices)"
+    )
+
     @property
     def choice_type(self) -> ChoiceType:
         """Get the choice type as an enum"""
         return ChoiceType.STICKY if self.sticky else ChoiceType.REGULAR
 
+
 def extract_parts(text):
     # Use re.DOTALL flag to make . match newlines too
-    pattern = r'(.*)(?<!\\)\[([^\]]*)\](.*)'
-    
+    pattern = r"(.*)(?<!\\)\[([^\]]*)\](.*)"
+
     match = re.match(pattern, text, re.DOTALL)
-    
+
     if match:
         before, inside, after = match.groups()
-        
+
         # Version 1: before + inside
         version1 = before + inside
-        
-        # Version 2: before + after  
+
+        # Version 2: before + after
         version2 = before + after
-        
+
         return version1, version2
     else:
         # No brackets found, return original text twice
         return text, text
 
-def parse_only_once_choice(buffer: list[str], line_number: int, key_id:int) -> Choice:
-    display_text, text_after_choice = extract_parts("\n".join(buffer))
-    return Choice(
-        key_id=key_id,
-        display_text=display_text,
-        text_after_choice=text_after_choice,
-        line_number=line_number,
-        sticky=False,
-    )
 
-
-def parse_choices(lines:str)->list[Choice]:
-    lines_list = lines.split('\n')
+def parse_choices(lines: str) -> list[Choice]:
+    lines_list = lines.split("\n")
     i = 0
-    key_id=0
-    choices=[]
+    key_id = 0
+    choices: list[Choice] = []
     while i < len(lines_list):
         line = lines_list[i]
         stripped = line.strip()
@@ -77,8 +79,10 @@ def parse_choices(lines:str)->list[Choice]:
                     # Don't increment i here - we want to process this line in the outer loop
                     break
             # print(choice_buffer)
-            choices.append(parse_only_once_choice(choice_buffer, line_number, key_id=key_id))
-            key_id+=1
+            # choices.append(
+            #     parse_only_once_choice(choice_buffer, line_number, key_id=key_id)
+            # )
+            key_id += 1
         else:
             i += 1
     return choices
