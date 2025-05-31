@@ -9,7 +9,7 @@ class Container(BaseModel):
     # Instance fields
     _id: int = PrivateAttr(default_factory=lambda: Container._get_next_id())
     content: Optional[str] = None
-    children: list[tuple[Condition, "Container", Optional[int]]] = Field(
+    children: list[tuple[Condition, "Container"]] = Field(
         default_factory=list
     )  # Added container_id for condition evaluation
     is_choice: bool = False

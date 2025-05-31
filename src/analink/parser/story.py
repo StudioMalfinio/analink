@@ -2,8 +2,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from analink.parser.base import Container
 from analink.parser.condition import Condition
+from analink.parser.container import Container
 from analink.parser.status import ContainerState, ContainerStatus
 
 
@@ -41,8 +41,8 @@ class Story(BaseModel):
                 state.status = ContainerStatus.SEEN
 
         # Check children based on conditions
-        for condition, child, condition_container_id in current_container.children:
-            if self._evaluate_condition(condition, condition_container_id):
+        for condition, child in current_container.children:
+            if self._evaluate_condition(condition, child.item_id):
                 available.extend(self.get_available_content(child))
 
         return available
