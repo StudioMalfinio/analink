@@ -13,6 +13,7 @@ class Story(BaseModel):
     root: Container
     global_state: dict[int, ContainerState] = Field(default_factory=dict)
     game_state: dict[str, Any] = Field(default_factory=dict)
+    # TODO: Any for game state is bad, variable have given type , maybe create a variable class??
     current_turn: int = 0
 
     def get_container_state(self, container_id: int) -> ContainerState:
@@ -37,6 +38,7 @@ class Story(BaseModel):
             state = self.get_container_state(current_container.item_id)
             state.seen_count += 1
             state.last_seen_turn = self.current_turn
+            # TODO : probably not a unique status but more like a set of flag should be in ContainerState
             if state.status == ContainerStatus.NOT_SEEN:
                 state.status = ContainerStatus.SEEN
 
@@ -48,18 +50,16 @@ class Story(BaseModel):
         return available
 
     def _evaluate_condition(
-        self, condition: Condition, container_id: Optional[int] = None
+        self, condition: Condition, container_id: int
     ) -> bool:
         """Evaluate any condition with optional container context"""
-        container_state = None
-        if container_id is not None:
-            container_state = self.get_container_state(container_id)
-
+        container_state = self.get_container_state(container_id)
         return condition.evaluate(container_state, self.game_state, self.current_turn)
 
     def click_choice(self, choice_id: int) -> None:
         """Mark a choice as clicked"""
         state = self.get_container_state(choice_id)
+        # TODO : probably not a unique status but more like a set of flag should be in ContainerState
         state.status = ContainerStatus.CLICKED
         self.current_turn += 1
 
