@@ -65,14 +65,15 @@ def parse_choices(lines: str) -> list[Choice]:
     while i < len(lines_list):
         line = lines_list[i]
         stripped = line.strip()
-        if count_leading_chars(stripped, "*") > 0:
-            line_number = i
+        choice_count, choice_text = count_leading_chars(stripped, "*")
+        if choice_count > 0:
             choice_buffer = [line.lstrip("*").strip()]
             i += 1
             while i < len(lines_list):
                 line = lines_list[i]
                 stripped = line.strip()
-                if count_leading_chars(stripped, "*") == 0:
+                choice_count, choice_text = count_leading_chars(stripped, "*")
+                if choice_text == 0:
                     choice_buffer.append(stripped)
                     i += 1
                 else:

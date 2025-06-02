@@ -72,6 +72,21 @@ VAR DEBUG = false
 	Start the story!
 
 --------------------------------------------------------------------------------*/
+=== missing_reel === 
+	*	[The stolen component...]
+	*	[Shrug]
+		I shrug. 
+		->->
+	- 	The reel went missing from the Bombe this afternoon. The four of us were in the Hut, working on the latest German intercept. The results were garbage. It was Russell who found the gap in the plugboard. 
+	-	Any of us could have taken it; and no one else would have known its worth.
+ 	
+ 		*	{forceful <= 0 }[Panic] They will pin it on me. They need a scapegoat so that the work can continue. I'm a likely target. Weaker than the rest. 
+ 			~ lower(forceful)
+ 		*	[Calculate] My odds, then, are one in four. Not bad; although the stakes themselves are higher than I would like.
+ 			~ raise(evasive)
+ 		*	{evasive >= 0} [Deny] But this is still a mere formality. The work will not stop. A replacement component will be made and we will all be put back to work. We are too valuable to shoot. 
+ 			~ raise(forceful)
+ 	-	->->
 
 === start === 
 
@@ -193,21 +208,7 @@ VAR DEBUG = false
  				-> no
  	-	-> missing_reel -> harris_demands_component
 
-=== missing_reel === 
-	*	[The stolen component...]
-	*	[Shrug]
-		I shrug. 
-		->->
-	- 	The reel went missing from the Bombe this afternoon. The four of us were in the Hut, working on the latest German intercept. The results were garbage. It was Russell who found the gap in the plugboard. 
-	-	Any of us could have taken it; and no one else would have known its worth.
- 	
- 		*	{forceful <= 0 }[Panic] They will pin it on me. They need a scapegoat so that the work can continue. I'm a likely target. Weaker than the rest. 
- 			~ lower(forceful)
- 		*	[Calculate] My odds, then, are one in four. Not bad; although the stakes themselves are higher than I would like.
- 			~ raise(evasive)
- 		*	{evasive >= 0} [Deny] But this is still a mere formality. The work will not stop. A replacement component will be made and we will all be put back to work. We are too valuable to shoot. 
- 			~ raise(forceful)
- 	-	->->
+
 
 
 === here_at_bletchley_diversion
