@@ -1,4 +1,4 @@
-import re
+
 from enum import Enum
 from typing import Optional
 
@@ -35,26 +35,6 @@ class Choice(BaseModel):
         """Get the choice type as an enum"""
         return ChoiceType.STICKY if self.sticky else ChoiceType.REGULAR
 
-
-def extract_parts(text):
-    # Use re.DOTALL flag to make . match newlines too
-    pattern = r"(.*)(?<!\\)\[([^\]]*)\](.*)"
-
-    match = re.match(pattern, text, re.DOTALL)
-
-    if match:
-        before, inside, after = match.groups()
-
-        # Version 1: before + inside
-        version1 = before + inside
-
-        # Version 2: before + after
-        version2 = before + after
-
-        return version1, version2
-    else:
-        # No brackets found, return original text twice
-        return text, text
 
 
 def parse_choices(lines: str) -> list[Choice]:

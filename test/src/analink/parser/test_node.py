@@ -545,11 +545,13 @@ There's a door to your left and a window to your right.
         assert "There's a door" in nodes[0].content
 
         assert nodes[1].node_type == NodeType.CHOICE
-        assert nodes[1].content == "[Open the door] -> door_path"
+        assert nodes[1].content == " -> door_path"
+        assert nodes[1].choice_text == "Open the door"
         assert nodes[1].level == 1
 
         assert nodes[2].node_type == NodeType.CHOICE
-        assert nodes[2].content == "[Look out the window] -> window_path"
+        assert nodes[2].content == " -> window_path"
+        assert nodes[2].choice_text == "Look out the window"
         assert nodes[2].level == 1
 
         assert nodes[3].node_type == NodeType.GATHER
