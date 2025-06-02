@@ -1,12 +1,11 @@
 import pytest
 
-from analink.parser.container import Container
-from analink.parser.line import InkLineType, clean_lines
-from analink.parser.tool import parse_story
+from analink.parser.graph_story import graph_to_mermaid, parse_story
+from analink.parser.node import Node, NodeType, clean_lines
 
 
 @pytest.mark.parametrize(
-    "ink_code, expected_lines, expected_tree, expected_mermaid",
+    "ink_code, expected_nodes, expected_mermaid",
     [
         [
             """
@@ -28,134 +27,72 @@ from analink.parser.tool import parse_story
 -  D
 """,
             {
-                0: {"text": "A", "level": 1, "line_type": InkLineType.GATHER},
-                1: {"text": "B C", "level": 1, "line_type": InkLineType.CHOICE},
-                2: {"text": "AA BB", "level": 2, "line_type": InkLineType.CHOICE},
-                3: {"text": "AAA", "level": 3, "line_type": InkLineType.CHOICE},
-                4: {"text": "BBB", "level": 3, "line_type": InkLineType.CHOICE},
-                5: {"text": "CCC", "level": 3, "line_type": InkLineType.GATHER},
-                6: {"text": "DDD EEE", "level": 3, "line_type": InkLineType.CHOICE},
-                7: {"text": "FFF", "level": 3, "line_type": InkLineType.CHOICE},
-                8: {"text": "GGG", "level": 3, "line_type": InkLineType.CHOICE},
-                9: {"text": "CC", "level": 2, "line_type": InkLineType.CHOICE},
-                10: {"text": "DD", "level": 2, "line_type": InkLineType.GATHER},
-                11: {"text": "C", "level": 1, "line_type": InkLineType.CHOICE},
-                12: {"text": "D", "level": 1, "line_type": InkLineType.GATHER},
+                1: {"text": "A", "level": 1, "node_type": NodeType.GATHER},
+                4: {"text": "B C", "level": 1, "node_type": NodeType.CHOICE},
+                7: {"text": "AA BB", "level": 2, "node_type": NodeType.CHOICE},
+                8: {"text": "AAA", "level": 3, "node_type": NodeType.CHOICE},
+                9: {"text": "BBB", "level": 3, "node_type": NodeType.CHOICE},
+                10: {"text": "CCC", "level": 3, "node_type": NodeType.GATHER},
+                13: {"text": "DDD EEE", "level": 3, "node_type": NodeType.CHOICE},
+                14: {"text": "FFF", "level": 3, "node_type": NodeType.CHOICE},
+                15: {"text": "GGG", "level": 3, "node_type": NodeType.CHOICE},
+                16: {"text": "CC", "level": 2, "node_type": NodeType.CHOICE},
+                17: {"text": "DD", "level": 2, "node_type": NodeType.GATHER},
+                18: {"text": "C", "level": 1, "node_type": NodeType.CHOICE},
+                19: {"text": "D", "level": 1, "node_type": NodeType.GATHER},
             },
-            """=== CONTAINER ID : 13 ===
-    A
-├── === CONTAINER ID : 10 ===
-│   B C
-│   ├── === CONTAINER ID : 7 ===
-│   │   AA BB
-│   │   ├── === CONTAINER ID : 1 ===
-│   │   │   AAA
-│   │   │   └── === CONTAINER ID : 6 ===
-│   │   │       CCC
-│   │   │       ├── === CONTAINER ID : 3 ===
-│   │   │       │   DDD EEE
-│   │   │       │   └── === CONTAINER ID : 9 ===
-│   │   │       │       DD
-│   │   │       │       └── === CONTAINER ID : 12 ===
-│   │   │       │           D
-│   │   │       ├── === CONTAINER ID : 4 ===
-│   │   │       │   FFF
-│   │   │       │   └── === CONTAINER ID : 9 ===
-│   │   │       │       DD
-│   │   │       │       └── === CONTAINER ID : 12 ===
-│   │   │       │           D
-│   │   │       └── === CONTAINER ID : 5 ===
-│   │   │           GGG
-│   │   │           └── === CONTAINER ID : 9 ===
-│   │   │               DD
-│   │   │               └── === CONTAINER ID : 12 ===
-│   │   │                   D
-│   │   └── === CONTAINER ID : 2 ===
-│   │       BBB
-│   │       └── === CONTAINER ID : 6 ===
-│   │           CCC
-│   │           ├── === CONTAINER ID : 3 ===
-│   │           │   DDD EEE
-│   │           │   └── === CONTAINER ID : 9 ===
-│   │           │       DD
-│   │           │       └── === CONTAINER ID : 12 ===
-│   │           │           D
-│   │           ├── === CONTAINER ID : 4 ===
-│   │           │   FFF
-│   │           │   └── === CONTAINER ID : 9 ===
-│   │           │       DD
-│   │           │       └── === CONTAINER ID : 12 ===
-│   │           │           D
-│   │           └── === CONTAINER ID : 5 ===
-│   │               GGG
-│   │               └── === CONTAINER ID : 9 ===
-│   │                   DD
-│   │                   └── === CONTAINER ID : 12 ===
-│   │                       D
-│   └── === CONTAINER ID : 8 ===
-│       CC
-│       └── === CONTAINER ID : 9 ===
-│           DD
-│           └── === CONTAINER ID : 12 ===
-│               D
-└── === CONTAINER ID : 11 ===
-    C
-    └── === CONTAINER ID : 12 ===
-        D""",
             """```mermaid
 flowchart TD
-    13["A"]
-    13 --> 10
-    10["B C"]
-    10 --> 7
+    1["A"]
+    4["B C"]
     7["AA BB"]
-    7 --> 1
-    1["AAA"]
-    1 --> 6
-    6["CCC"]
-    6 --> 3
-    3["DDD EEE"]
-    3 --> 9
-    9["DD"]
-    9 --> 12
-    12["D"]
-    6 --> 4
-    4["FFF"]
-    4 --> 9
-    6 --> 5
-    5["GGG"]
-    5 --> 9
-    7 --> 2
-    2["BBB"]
-    2 --> 6
-    10 --> 8
-    8["CC"]
-    8 --> 9
-    13 --> 11
-    11["C"]
-    11 --> 12
+    8["AAA"]
+    9["BBB"]
+    10["CCC"]
+    13["DDD EEE"]
+    14["FFF"]
+    15["GGG"]
+    16["CC"]
+    17["DD"]
+    18["C"]
+    19["D"]
+    1 --> 4
+    4 --> 7
+    7 --> 8
+    7 --> 9
+    8 --> 10
+    9 --> 10
+    10 --> 13
+    10 --> 14
+    10 --> 15
+    4 --> 16
+    13 --> 17
+    14 --> 17
+    15 --> 17
+    16 --> 17
+    1 --> 18
+    17 --> 19
+    18 --> 19
 ```""",
         ]
     ],
 )
-def test_parser_story_full(ink_code, expected_lines, expected_tree, expected_mermaid):
+def test_parser_story_full(ink_code, expected_nodes, expected_mermaid):
     # With
-    Container.reset_id_counter()
+    Node.reset_id_counter()
 
     # When
-    actual_lines = clean_lines(ink_code)
+    actual_nodes = clean_lines(ink_code)
 
     # Then
-    assert len(actual_lines) == len(expected_lines)
-    for k in range(len(actual_lines)):
-        assert actual_lines[k].text == expected_lines[k]["text"]
-        assert actual_lines[k].level == expected_lines[k]["level"]
-        assert actual_lines[k].line_type is expected_lines[k]["line_type"]
+    assert len(actual_nodes) == len(expected_nodes)
+    for k in actual_nodes:
+        assert actual_nodes[k].content == expected_nodes[k]["text"]
+        assert actual_nodes[k].level == expected_nodes[k]["level"]
+        assert actual_nodes[k].node_type is expected_nodes[k]["node_type"]
 
     # When
-    actual_container = parse_story(actual_lines)
-    actual_tree = actual_container.print_tree()
-    actual_mermaid = actual_container.container_to_mermaid()
+    actual_edges = parse_story(actual_nodes)
+    actual_mermaid = graph_to_mermaid(actual_nodes, actual_edges)
 
-    assert actual_tree == expected_tree
     assert actual_mermaid == expected_mermaid

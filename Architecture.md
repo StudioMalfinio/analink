@@ -96,34 +96,69 @@ parse(text, 0) =
     
 ```mermaid
 flowchart TD
-    30["I looked at Monsieur Fogg"]
-    30 --> 27
-    27["... and I could contain myself no longer. 'What..."]
-    27 --> 24
-    24["'A wager!'[] I returned. He nodded."]
-    24 --> 18
-    18["'But surely that is foolishness!'"]
-    18 --> 23
-    23["He nodded again."]
-    23 --> 20
-    20["'But can we win?' 'That is what we will endeavo..."]
-    20 --> 26
-    26["After that, <>"]
-    26 --> 29
-    29["we passed the day in silence."]
-    23 --> 21
-    21["'A modest wager, I trust?' 'Twenty thousand pou..."]
-    21 --> 26
-    23 --> 22
-    22["I asked nothing further of him then[.], and aft..."]
-    22 --> 26
-    24 --> 19
-    19["'A most serious matter then!'"]
-    19 --> 23
-    27 --> 25
-    25["'Ah[.'],' I replied, uncertain what I thought."]
-    25 --> 26
-    30 --> 28
-    28["... but I said nothing[] and <>"]
-    28 --> 29
+    1["A"]
+    4["B C"]
+    7["AA BB"]
+    8["AAA"]
+    9["BBB"]
+    10["CCC"]
+    13["DDD EEE"]
+    14["FFF"]
+    15["GGG"]
+    16["CC"]
+    17["DD"]
+    18["C"]
+    19["D"]
+    1 --> 4
+    4 --> 7
+    7 --> 8
+    7 --> 9
+    8 --> 10
+    9 --> 10
+    10 --> 13
+    10 --> 14
+    10 --> 15
+    4 --> 16
+    13 --> 17
+    14 --> 17
+    15 --> 17
+    16 --> 17
+    1 --> 18
+    17 --> 19
+    18 --> 19
+```
+
+
+```mermaid
+flowchart TD
+    13["A"]
+    13 --> 10
+    10["B C"]
+    10 --> 7
+    7["AA BB"]
+    7 --> 1
+    1["AAA"]
+    1 --> 6
+    6["CCC"]
+    6 --> 3
+    3["DDD EEE"]
+    3 --> 9
+    9["DD"]
+    9 --> 12
+    12["D"]
+    6 --> 4
+    4["FFF"]
+    4 --> 9
+    6 --> 5
+    5["GGG"]
+    5 --> 9
+    7 --> 2
+    2["BBB"]
+    2 --> 6
+    10 --> 8
+    8["CC"]
+    8 --> 9
+    13 --> 11
+    11["C"]
+    11 --> 12
 ```
