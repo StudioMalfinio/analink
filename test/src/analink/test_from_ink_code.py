@@ -27,19 +27,84 @@ from analink.parser.node import Node, NodeType, clean_lines
 -  D
 """,
             {
-                1: {"text": "A", "level": 1, "node_type": NodeType.GATHER, "choice_text":None},
-                4: {"text": "B C", "level": 1, "node_type": NodeType.CHOICE, "choice_text":"B C"},
-                7: {"text": "AA BB", "level": 2, "node_type": NodeType.CHOICE, "choice_text":"AA BB"},
-                8: {"text": "AAA", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"AAA"},
-                9: {"text": "BBB", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"BBB"},
-                10: {"text": "CCC", "level": 3, "node_type": NodeType.GATHER, "choice_text":None},
-                13: {"text": "DDD EEE", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"DDD EEE"},
-                14: {"text": "FFF", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"FFF"},
-                15: {"text": "GGG", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"GGG"},
-                16: {"text": "CC", "level": 2, "node_type": NodeType.CHOICE, "choice_text":"CC"},
-                17: {"text": "DD", "level": 2, "node_type": NodeType.GATHER, "choice_text":None},
-                18: {"text": "C", "level": 1, "node_type": NodeType.CHOICE, "choice_text":"C"},
-                19: {"text": "D", "level": 1, "node_type": NodeType.GATHER, "choice_text":None},
+                1: {
+                    "text": "A",
+                    "level": 1,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
+                4: {
+                    "text": "B C",
+                    "level": 1,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "B C",
+                },
+                7: {
+                    "text": "AA BB",
+                    "level": 2,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "AA BB",
+                },
+                8: {
+                    "text": "AAA",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "AAA",
+                },
+                9: {
+                    "text": "BBB",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "BBB",
+                },
+                10: {
+                    "text": "CCC",
+                    "level": 3,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
+                13: {
+                    "text": "DDD EEE",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "DDD EEE",
+                },
+                14: {
+                    "text": "FFF",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "FFF",
+                },
+                15: {
+                    "text": "GGG",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "GGG",
+                },
+                16: {
+                    "text": "CC",
+                    "level": 2,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "CC",
+                },
+                17: {
+                    "text": "DD",
+                    "level": 2,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
+                18: {
+                    "text": "C",
+                    "level": 1,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "C",
+                },
+                19: {
+                    "text": "D",
+                    "level": 1,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
             },
             """```mermaid
 flowchart TD
@@ -95,19 +160,84 @@ flowchart TD
 -  D
 """,
             {
-                1: {"text": "A", "level": 1, "node_type": NodeType.GATHER, "choice_text":None},
-                4: {"text": "B C", "level": 1, "node_type": NodeType.CHOICE, "choice_text":"B K"},
-                7: {"text": "AA BB", "level": 2, "node_type": NodeType.CHOICE, "choice_text":"AA BB"},
-                8: {"text": "AAA", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"AAU"},
-                9: {"text": "BBB", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"BBB"},
-                10: {"text": "CCC", "level": 3, "node_type": NodeType.GATHER, "choice_text":None},
-                13: {"text": "DDD EEE", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"DDD EEE"},
-                14: {"text": "FFF", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"FFF"},
-                15: {"text": "GGG", "level": 3, "node_type": NodeType.CHOICE, "choice_text":"GGG"},
-                16: {"text": "CC", "level": 2, "node_type": NodeType.CHOICE, "choice_text":"CC"},
-                17: {"text": "DD", "level": 2, "node_type": NodeType.GATHER, "choice_text":None},
-                18: {"text": "C", "level": 1, "node_type": NodeType.CHOICE, "choice_text":"C"},
-                19: {"text": "D", "level": 1, "node_type": NodeType.GATHER, "choice_text":None},
+                1: {
+                    "text": "A",
+                    "level": 1,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
+                4: {
+                    "text": "B C",
+                    "level": 1,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "B K",
+                },
+                7: {
+                    "text": "AA BB",
+                    "level": 2,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "AA BB",
+                },
+                8: {
+                    "text": "AAA",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "AAU",
+                },
+                9: {
+                    "text": "BBB",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "BBB",
+                },
+                10: {
+                    "text": "CCC",
+                    "level": 3,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
+                13: {
+                    "text": "DDD EEE",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "DDD EEE",
+                },
+                14: {
+                    "text": "FFF",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "FFF",
+                },
+                15: {
+                    "text": "GGG",
+                    "level": 3,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "GGG",
+                },
+                16: {
+                    "text": "CC",
+                    "level": 2,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "CC",
+                },
+                17: {
+                    "text": "DD",
+                    "level": 2,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
+                18: {
+                    "text": "C",
+                    "level": 1,
+                    "node_type": NodeType.CHOICE,
+                    "choice_text": "C",
+                },
+                19: {
+                    "text": "D",
+                    "level": 1,
+                    "node_type": NodeType.GATHER,
+                    "choice_text": None,
+                },
             },
             """```mermaid
 flowchart TD
@@ -142,7 +272,7 @@ flowchart TD
     17 --> 19
     18 --> 19
 ```""",
-        ]
+        ],
     ],
 )
 def test_parser_story_full(ink_code, expected_nodes, expected_mermaid):

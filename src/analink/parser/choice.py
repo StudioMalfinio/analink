@@ -1,4 +1,3 @@
-
 from enum import Enum
 from typing import Optional
 
@@ -34,7 +33,6 @@ class Choice(BaseModel):
     def choice_type(self) -> ChoiceType:
         """Get the choice type as an enum"""
         return ChoiceType.STICKY if self.sticky else ChoiceType.REGULAR
-
 
 
 def parse_choices(lines: str) -> list[Choice]:

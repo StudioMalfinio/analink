@@ -1,3 +1,5 @@
+from typing import Optional
+
 import networkx as nx
 
 from analink.parser.node import Node, NodeType
@@ -77,18 +79,19 @@ def parse_story(
     return edges
 
 
-def escape_mermaid_text(text: str) -> str:
+def escape_mermaid_text(text: Optional[str]) -> str:
     """Escape text for use in Mermaid diagrams"""
     if not text:
         return ""
-    
+
     # Replace quotes with escaped versions or alternatives
-    text = text.replace('"', '&quot;')  # HTML entity for double quotes
-    text = text.replace("'", '&#39;')   # HTML entity for single quotes
-    text = text.replace('\n', ' ')      # Replace newlines with spaces
-    text = text.replace('|', '&#124;')  # Escape pipe characters (special in Mermaid)
-    
+    text = text.replace('"', "&quot;")  # HTML entity for double quotes
+    text = text.replace("'", "&#39;")  # HTML entity for single quotes
+    text = text.replace("\n", " ")  # Replace newlines with spaces
+    text = text.replace("|", "&#124;")  # Escape pipe characters (special in Mermaid)
+
     return text
+
 
 def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> str:
     """Convert nodes and edges to Mermaid flowchart"""

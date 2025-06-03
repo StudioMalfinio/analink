@@ -1,6 +1,7 @@
+import re
 from enum import Enum
 from typing import ClassVar, Optional
-import re
+
 from pydantic import BaseModel, PrivateAttr, computed_field
 
 
