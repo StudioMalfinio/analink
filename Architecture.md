@@ -162,3 +162,15 @@ flowchart TD
     11["C"]
     11 --> 12
 ```
+
+
+```mermaid
+flowchart TD
+    20["'What's that?' my master asked."]
+    23{"'I am somewhat tired,' I repeated. 'Really,' he..."}
+    26{"'Nothing, Monsieur!' I replied. 'Very good, then.'"}
+    29{"'I said, this journey is appalling and I want n..."}
+    20 -->|&quot;I am somewhat tired.&quot;| 23
+    20 -->|&quot;Nothing, Monsieur!&quot;| 26
+    20 -->|&quot;I said, this journey is appalling.&quot;| 29
+```

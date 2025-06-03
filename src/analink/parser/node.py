@@ -64,6 +64,7 @@ class Node(BaseModel):
         choice_content, display_content = extract_parts(self.content)
         self.choice_text = choice_content
         self.content = display_content
+        return self
 
 
 def count_leading_chars(line: str, char: str) -> tuple[int, str]:
@@ -97,15 +98,13 @@ def parse_node(line: str, line_number: int) -> Optional[Node]:
     choice_count, text_choice = count_leading_chars(stripped, "*")
     gather_count, text_gather = count_leading_chars(stripped, "-")
     if choice_count > 0:
-        node = Node(
+        return Node(
             level=choice_count,
             node_type=NodeType.CHOICE,
             content=text_choice,
             raw_content=line,
             line_number=line_number,
         )
-        node.parse_choice()
-        return node
     if gather_count > 0:
         return Node(
             level=gather_count,
@@ -151,8 +150,6 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> dict[int, Node]:
                     + parsed_line.raw_content,
                     line_number=lines[previous_item_id].line_number,
                 )
-                if lines[previous_item_id].node_type is NodeType.CHOICE:
-                    merged_node.parse_choice()
                 lines[merged_node.item_id] = merged_node
                 del lines[previous_item_id]
                 previous_item_id = merged_node.item_id
@@ -160,4 +157,8 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> dict[int, Node]:
             lines[parsed_line.item_id] = parsed_line
             previous_item_id = parsed_line.item_id
         i += 1
-    return lines
+
+    return {
+        k: node.parse_choice() if node.node_type is NodeType.CHOICE else node
+        for k, node in lines.items()
+    }

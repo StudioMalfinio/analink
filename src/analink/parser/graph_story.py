@@ -77,6 +77,19 @@ def parse_story(
     return edges
 
 
+def escape_mermaid_text(text: str) -> str:
+    """Escape text for use in Mermaid diagrams"""
+    if not text:
+        return ""
+    
+    # Replace quotes with escaped versions or alternatives
+    text = text.replace('"', '&quot;')  # HTML entity for double quotes
+    text = text.replace("'", '&#39;')   # HTML entity for single quotes
+    text = text.replace('\n', ' ')      # Replace newlines with spaces
+    text = text.replace('|', '&#124;')  # Escape pipe characters (special in Mermaid)
+    
+    return text
+
 def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> str:
     """Convert nodes and edges to Mermaid flowchart"""
     lines = ["```mermaid", "flowchart TD"]
@@ -90,13 +103,20 @@ def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> st
         )
         if len(content) > 50:
             content = content[:47] + "..."
-        lines.append(f'    {node_id}["{content}"]')
+        if node.node_type is NodeType.CHOICE:
+            lines.append(f'    {node_id}{{"{content}"}}')
+        else:
+            lines.append(f'    {node_id}["{content}"]')
 
     # Add all edges (avoid duplicates)
     for source, target in edges:
         edge = (source, target)
         if edge not in added_edges:
-            lines.append(f"    {source} --> {target}")
+            if nodes[target].node_type is NodeType.CHOICE:
+                choice_text = escape_mermaid_text(nodes[target].choice_text)
+                lines.append(f"    {source} -->|{choice_text}| {target}")
+            else:
+                lines.append(f"    {source} --> {target}")
             added_edges.add(edge)
 
     lines.append("```")
