@@ -181,14 +181,15 @@ class StoryEngine:
             next_node = self.nodes.get(next_node_id)
 
             if next_node:
+                self.current_node_id = next_node_id
                 # Add content from gather nodes and base content to history
                 if next_node.node_type == NodeType.GATHER and next_node.content:
                     self._add_content(next_node.content)
                 elif next_node.node_type == NodeType.BASE and next_node.content:
                     self._add_content(next_node.content)
-
-            # Move to this node
-            self.current_node_id = next_node_id
+            else:
+                # Move to this node
+                self.current_node_id = next_node_id
 
     def _get_next_nodes(self, node_id: int) -> List[int]:
         """Get the next nodes from the current node."""

@@ -124,9 +124,11 @@ class InkStoryApp(App):
         # Text streaming state
         self.is_typing = False
         self.displayed_story_text = ""
-        self.pending_new_content: List[str] = []
+        self.pending_new_content: List[tuple[str, str]] = []
         self.current_typing_content = ""
         self.current_typing_position = 0
+        self._next_content_glued = False
+        self.block_separator = "\n\n"
 
         # Connect story engine callbacks
         self.story_engine.on_content_added = self._on_content_added
@@ -162,9 +164,25 @@ class InkStoryApp(App):
 
     def _on_content_added(self, content: str):
         """Callback when new content is added to the story."""
+        block_separator = "\n\n"
+        # Get the current node to check for glue properties
+        current_node = self.story_engine.nodes.get(self.story_engine.current_node_id)
+
+        # Check for glue_before - affects separator before this content
+        if current_node and current_node.glue_before:
+            block_separator = ""
+        if self._next_content_glued:
+            block_separator = ""
+            self._next_content_glued = False
+        # content+=f" PRINT : {current_node.glue_before, current_node.content}"
         # Queue the content for typing
         formatted_content = self._format_content(content)
-        self.pending_new_content.append(formatted_content)
+        self.pending_new_content.append((block_separator, formatted_content))
+
+        # Check for glue_after - affects separator after this content
+        if current_node and current_node.glue_after:
+            # Store that next content should be glued
+            self._next_content_glued = True
 
         # Start typing if not already typing
         if not self.is_typing:
@@ -203,7 +221,7 @@ class InkStoryApp(App):
             return
 
         self.is_typing = True
-        self.current_typing_content = self.pending_new_content[0]
+        self.block_separator, self.current_typing_content = self.pending_new_content[0]
         self.current_typing_position = 0
         self._type_next_character()
 
@@ -212,7 +230,7 @@ class InkStoryApp(App):
         if self.current_typing_position >= len(self.current_typing_content):
             # Finished typing this piece of content
             self.displayed_story_text += (
-                "\n\n" + self.current_typing_content
+                self.block_separator + self.current_typing_content
                 if self.displayed_story_text
                 else self.current_typing_content
             )
@@ -243,7 +261,7 @@ class InkStoryApp(App):
 
         # Build the complete text to display (old + partial new)
         if self.displayed_story_text:
-            display_text = self.displayed_story_text + "\n\n" + next_text
+            display_text = self.displayed_story_text + self.block_separator + next_text
         else:
             display_text = next_text
 
@@ -257,7 +275,7 @@ class InkStoryApp(App):
         else:
             # If delay is 0, show all content immediately
             self.displayed_story_text += (
-                "\n\n" + self.current_typing_content
+                self.block_separator + self.current_typing_content
                 if self.displayed_story_text
                 else self.current_typing_content
             )

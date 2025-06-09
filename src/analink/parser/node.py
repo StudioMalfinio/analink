@@ -51,6 +51,8 @@ class Node(BaseModel):
     name: Optional[str] = None
     content: Optional[str] = None
     choice_text: Optional[str] = None
+    glue_before: bool = False
+    glue_after: bool = False
 
     _next_id: ClassVar[int] = 1
 
@@ -116,6 +118,16 @@ class Node(BaseModel):
                     name=divert_target.strip(),
                 )
         return None
+
+    def parse_glue(self):
+        if self.content is None:
+            return
+        if "<>" in self.content:
+            if self.content.startswith("<>"):
+                self.glue_before = True
+            else:
+                self.glue_after = True
+            self.content = self.content.replace("<>", "")
 
 
 def count_leading_chars(line: str, char: str) -> tuple[int, str]:
@@ -350,20 +362,26 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> RawStory:
             node.parse_choice()
         if last_knot is None:
             # add to header
+            node.parse_glue()
             header[k] = node
             if new_node is not None:
+                new_node.parse_glue()
                 header[new_node.item_id] = new_node
         else:
             # add to stitches
             if last_stitches is not None:
+                node.parse_glue()
                 stitches[last_stitches][node.item_id] = node
                 if new_node is not None:
+                    new_node.parse_glue()
                     stitches[last_stitches][new_node.item_id] = new_node
             else:
                 if knot_header is None:
                     knot_header = {}
+                node.parse_glue()
                 knot_header[node.item_id] = node
                 if new_node is not None:
+                    new_node.parse_glue()
                     knot_header[new_node.item_id] = new_node
     if knot_header is not None:
         # finish the previous knot
