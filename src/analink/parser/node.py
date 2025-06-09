@@ -53,6 +53,7 @@ class Node(BaseModel):
     choice_text: Optional[str] = None
     glue_before: bool = False
     glue_after: bool = False
+    instruction: Optional[str] = None
 
     _next_id: ClassVar[int] = 1
 
@@ -128,6 +129,14 @@ class Node(BaseModel):
             else:
                 self.glue_after = True
             self.content = self.content.replace("<>", "")
+
+    def parse_instruction(self):
+        if self.content is None:
+            return
+        if "#" in self.content:
+            new_content, instruction = self.content.split("#")
+            self.content = new_content
+            self.instruction = instruction
 
 
 def count_leading_chars(line: str, char: str) -> tuple[int, str]:
@@ -392,25 +401,31 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> RawStory:
         if last_knot is None:
             # add to header
             node.parse_glue()
+            node.parse_instruction()
             header[k] = node
             if new_node is not None:
                 new_node.parse_glue()
+                new_node.parse_instruction()
                 header[new_node.item_id] = new_node
         else:
             # add to stitches
             if last_stitches is not None:
                 node.parse_glue()
+                node.parse_instruction()
                 stitches[last_stitches][node.item_id] = node
                 if new_node is not None:
                     new_node.parse_glue()
+                    new_node.parse_instruction()
                     stitches[last_stitches][new_node.item_id] = new_node
             else:
                 if knot_header is None:
                     knot_header = {}
                 node.parse_glue()
+                node.parse_instruction()
                 knot_header[node.item_id] = node
                 if new_node is not None:
                     new_node.parse_glue()
+                    new_node.parse_instruction()
                     knot_header[new_node.item_id] = new_node
     if knot_header is not None:
         # finish the previous knot
