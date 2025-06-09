@@ -280,18 +280,18 @@ def test_parser_story_full(ink_code, expected_nodes, expected_mermaid):
     Node.reset_id_counter()
 
     # When
-    actual_nodes = clean_lines(ink_code)
+    actual_nodes, actual_edges = parse_story(clean_lines(ink_code))
 
     # Then
-    assert len(actual_nodes) == len(expected_nodes)
+    assert len(actual_nodes) == len(expected_nodes) + 3
     for k in actual_nodes:
-        assert actual_nodes[k].content == expected_nodes[k]["text"]
-        assert actual_nodes[k].level == expected_nodes[k]["level"]
-        assert actual_nodes[k].node_type is expected_nodes[k]["node_type"]
-        assert actual_nodes[k].choice_text == expected_nodes[k]["choice_text"]
+        if k > -1:
+            assert actual_nodes[k].content == expected_nodes[k]["text"]
+            assert actual_nodes[k].level == expected_nodes[k]["level"]
+            assert actual_nodes[k].node_type is expected_nodes[k]["node_type"]
+            assert actual_nodes[k].choice_text == expected_nodes[k]["choice_text"]
 
     # When
-    actual_edges = parse_story(actual_nodes)
     actual_mermaid = graph_to_mermaid(actual_nodes, actual_edges)
 
     assert actual_mermaid == expected_mermaid

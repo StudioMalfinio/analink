@@ -174,3 +174,24 @@ flowchart TD
     20 -->|&quot;Nothing, Monsieur!&quot;| 26
     20 -->|&quot;I said, this journey is appalling.&quot;| 29
 ```
+
+
+```mermaid
+flowchart TD
+    3["We arrived into London at 9.45pm exactly."]
+    5["We hurried home to Savile Row as fast as we could."]
+    -2 --> 3
+    3 --> 5
+    5 --> -1
+```
+
+```mermaid
+flowchart TD
+    1["'What's that?' my master asked."]
+    4{"'I am somewhat tired,' I repeated. 'Really,' he..."}
+    7{"'Nothing, Monsieur!' I replied. 'Very good, then.'"}
+    10{"'I said, this journey is appalling and I want n..."}
+    1 -->|&quot;I am somewhat tired.&quot;| 4
+    1 -->|&quot;Nothing, Monsieur!&quot;| 7
+    1 -->|&quot;I said, this journey is appalling.&quot;| 10
+```

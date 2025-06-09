@@ -3,10 +3,102 @@ import pytest
 from analink.parser.node import (
     Node,
     NodeType,
+    RawKnot,
+    RawStory,
     clean_lines,
     count_leading_chars,
+    extract_knot_name,
+    extract_parts,
     parse_node,
 )
+
+
+class TestExtractParts:
+    """Test the extract_parts function"""
+
+    def test_extract_with_brackets(self):
+        """Test extracting text with brackets"""
+        text = "Go [north] into the forest"
+        version1, version2 = extract_parts(text)
+        assert version1 == "Go north"
+        assert version2 == "Go  into the forest"
+
+    def test_extract_with_brackets_at_start(self):
+        """Test brackets at the start of text"""
+        text = "[Open door] You open the door"
+        version1, version2 = extract_parts(text)
+        assert version1 == "Open door"
+        assert version2 == " You open the door"
+
+    def test_extract_with_brackets_at_end(self):
+        """Test brackets at the end of text"""
+        text = "Walk towards the [exit]"
+        version1, version2 = extract_parts(text)
+        assert version1 == "Walk towards the exit"
+        assert version2 == "Walk towards the "
+
+    def test_extract_no_brackets(self):
+        """Test text without brackets"""
+        text = "Simple text without brackets"
+        version1, version2 = extract_parts(text)
+        assert version1 == text
+        assert version2 == text
+
+    def test_extract_empty_brackets(self):
+        """Test empty brackets"""
+        text = "Text with [] empty brackets"
+        version1, version2 = extract_parts(text)
+        assert version1 == "Text with "
+        assert version2 == "Text with  empty brackets"
+
+    def test_extract_escaped_brackets(self):
+        """Test escaped brackets (should not be processed)"""
+        text = "Text with \\[escaped\\] brackets"
+        version1, version2 = extract_parts(text)
+        assert version1 == text
+        assert version2 == text
+
+    def test_extract_multiple_brackets_first_only(self):
+        """Test that only the first brackets are processed"""
+        text = "First [choice] and second [option]"
+        with pytest.raises(ValueError) as exc_info:
+            _ = extract_parts(text)
+        assert "2 occurrences" in str(exc_info)
+
+    def test_extract_multiline_text(self):
+        """Test brackets in multiline text"""
+        text = "Line one\n[Select] this option\nLine three"
+        version1, version2 = extract_parts(text)
+        assert version1 == "Line one\nSelect"
+        assert version2 == "Line one\n this option\nLine three"
+
+
+class TestExtractKnotName:
+    """Test the extract_knot_name function"""
+
+    def test_extract_double_equals(self):
+        """Test extracting knot name with double equals"""
+        assert extract_knot_name("== forest_path ==") == "forest_path"
+
+    def test_extract_multiple_equals(self):
+        """Test extracting with multiple equals"""
+        assert extract_knot_name("=== village ===") == "village"
+
+    def test_extract_uneven_equals(self):
+        """Test extracting with uneven equals"""
+        assert extract_knot_name("== castle_gate =") == "castle_gate"
+
+    def test_extract_only_leading_equals(self):
+        """Test extracting with only leading equals"""
+        assert extract_knot_name("== dungeon") == "dungeon"
+
+    def test_extract_with_spaces(self):
+        """Test extracting with spaces around name"""
+        assert extract_knot_name("==   mountain_peak   ==") == "mountain_peak"
+
+    def test_extract_simple_text(self):
+        """Test with text that doesn't match pattern"""
+        assert extract_knot_name("simple text") == "simple text"
 
 
 class TestNodeType:
@@ -17,12 +109,24 @@ class TestNodeType:
         assert NodeType.CHOICE.value == "choice"
         assert NodeType.GATHER.value == "gather"
         assert NodeType.BASE.value == "base_content"
+        assert NodeType.KNOT.value == "knot"
+        assert NodeType.STITCHES.value == "stitches"
+        assert NodeType.DIVERT.value == "divert"
+        assert NodeType.END.value == "end"
+        assert NodeType.BEGIN.value == "begin"
+        assert NodeType.AUTO_END.value == "auto_end"
 
     def test_node_type_members(self):
         """Test that all expected members exist"""
         assert hasattr(NodeType, "CHOICE")
         assert hasattr(NodeType, "GATHER")
         assert hasattr(NodeType, "BASE")
+        assert hasattr(NodeType, "KNOT")
+        assert hasattr(NodeType, "STITCHES")
+        assert hasattr(NodeType, "DIVERT")
+        assert hasattr(NodeType, "END")
+        assert hasattr(NodeType, "BEGIN")
+        assert hasattr(NodeType, "AUTO_END")
 
 
 class TestNode:
@@ -43,6 +147,7 @@ class TestNode:
         assert node.line_number == 1
         assert node.content is None
         assert node.choice_text is None
+        assert node.name is None
 
     def test_node_creation_with_optional_fields(self):
         """Test node creation with optional fields"""
@@ -53,6 +158,7 @@ class TestNode:
             line_number=5,
             content="Choice text",
             choice_text="Choice text",
+            name="choice_1",
         )
         assert node.node_type == NodeType.CHOICE
         assert node.raw_content == "* Choice text"
@@ -60,11 +166,11 @@ class TestNode:
         assert node.line_number == 5
         assert node.content == "Choice text"
         assert node.choice_text == "Choice text"
+        assert node.name == "choice_1"
 
     def test_item_id_property(self):
         """Test that item_id returns the private _id"""
         node = Node(node_type=NodeType.BASE, raw_content="test", level=0, line_number=1)
-        # The first node should have ID 1
         assert node.item_id == 1
 
     def test_id_increments(self):
@@ -85,22 +191,14 @@ class TestNode:
 
     def test_reset_id_counter(self):
         """Test that reset_id_counter resets the counter to 1"""
-        # Create a node to increment the counter
         Node(node_type=NodeType.BASE, raw_content="test", level=0, line_number=1)
-
-        # Reset counter
         Node.reset_id_counter()
-
-        # Next node should have ID 1
         node = Node(node_type=NodeType.BASE, raw_content="test", level=0, line_number=1)
         assert node.item_id == 1
 
     def test_get_next_id_class_method(self):
         """Test the _get_next_id class method"""
-        # Reset to ensure predictable state
         Node.reset_id_counter()
-
-        # Test that _get_next_id returns incremental values
         id1 = Node._get_next_id()
         id2 = Node._get_next_id()
         id3 = Node._get_next_id()
@@ -108,6 +206,99 @@ class TestNode:
         assert id1 == 1
         assert id2 == 2
         assert id3 == 3
+
+    def test_end_node_class_method(self):
+        """Test the end_node class method"""
+        node = Node.end_node()
+        assert node.node_type == NodeType.END
+        assert node.raw_content == ""
+        assert node.level == -1
+        assert node.line_number == -1
+        assert node.name == "END"
+
+    def test_auto_end_node_class_method(self):
+        """Test the auto_end_node class method"""
+        node = Node.auto_end_node()
+        assert node.node_type == NodeType.AUTO_END
+        assert node.raw_content == ""
+        assert node.level == -1
+        assert node.line_number == -1
+        assert node.name == "AUTO_END"
+
+    def test_begin_node_class_method(self):
+        """Test the begin_node class method"""
+        node = Node.begin_node()
+        assert node.node_type == NodeType.BEGIN
+        assert node.raw_content == ""
+        assert node.level == -1
+        assert node.line_number == -1
+        assert node.name == "BEGIN"
+
+    def test_parse_choice_with_brackets(self):
+        """Test parse_choice method with bracketed text"""
+        node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* [Open door] You open the heavy door",
+            level=1,
+            line_number=1,
+            content="[Open door] You open the heavy door",
+        )
+        result = node.parse_choice()
+        assert result.choice_text == "Open door"
+        assert result.content == " You open the heavy door"
+
+    def test_parse_choice_without_brackets(self):
+        """Test parse_choice method without brackets"""
+        node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Simple choice",
+            level=1,
+            line_number=1,
+            content="Simple choice",
+        )
+        result = node.parse_choice()
+        assert result.choice_text == "Simple choice"
+        assert result.content == "Simple choice"
+
+    def test_parse_divert_with_arrow(self):
+        """Test parse_divert method with arrow"""
+        node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Go to forest -> forest_path",
+            level=1,
+            line_number=1,
+            content="Go to forest -> forest_path",
+        )
+        divert_node = node.parse_divert()
+        assert divert_node is not None
+        assert divert_node.node_type == NodeType.DIVERT
+        assert divert_node.name == "forest_path"
+        assert node.content == "Go to forest"
+
+    def test_parse_divert_without_arrow(self):
+        """Test parse_divert method without arrow"""
+        node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Simple choice",
+            level=1,
+            line_number=1,
+            content="Simple choice",
+        )
+        divert_node = node.parse_divert()
+        assert divert_node is None
+        assert node.content == "Simple choice"
+
+    def test_parse_divert_with_empty_content(self):
+        """Test parse_divert with None content"""
+        node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Some text",
+            level=0,
+            line_number=1,
+            content=None,
+        )
+        divert_node = node.parse_divert()
+        assert divert_node is None
 
 
 class TestCountLeadingChars:
@@ -202,14 +393,34 @@ class TestParseNode:
         assert result is None
 
     def test_parse_directive_line(self):
-        """Test parsing directive line returns None"""
+        """Test parsing directive line returns DIVERT node"""
         result = parse_node("-> END", 1)
-        assert result is None
+        assert result is not None
+        assert result.node_type == NodeType.DIVERT
+        assert result.name == "END"
 
     def test_parse_directive_line_with_whitespace(self):
-        """Test parsing directive line with whitespace returns None"""
+        """Test parsing directive line with whitespace"""
         result = parse_node("  -> DONE  ", 1)
-        assert result is None
+        assert result is not None
+        assert result.node_type == NodeType.DIVERT
+        assert result.name == "DONE"
+
+    def test_parse_knot_double_equals(self):
+        """Test parsing knot with double equals"""
+        result = parse_node("== forest_path ==", 1)
+        assert result is not None
+        assert result.node_type == NodeType.KNOT
+        assert result.name == "forest_path"
+        assert result.level == 0
+
+    def test_parse_stitches_single_equals(self):
+        """Test parsing stitches with single equals"""
+        result = parse_node("= village_entrance", 1)
+        assert result is not None
+        assert result.node_type == NodeType.STITCHES
+        assert result.name == "village_entrance"
+        assert result.level == 0
 
     def test_parse_choice_single_star(self):
         """Test parsing single star choice"""
@@ -311,6 +522,287 @@ class TestParseNode:
         assert result.line_number == 1
 
 
+class TestRawKnot:
+    """Test the RawKnot class"""
+
+    def setup_method(self):
+        """Reset ID counter before each test"""
+        Node.reset_id_counter()
+
+    def test_raw_knot_creation(self):
+        """Test RawKnot creation"""
+        header = {
+            1: Node(
+                node_type=NodeType.BASE,
+                raw_content="Knot header",
+                level=0,
+                line_number=1,
+                content="Knot header",
+            )
+        }
+        stitches = {}
+        stitches_info = {}
+
+        knot = RawKnot(header=header, stitches=stitches, stitches_info=stitches_info)
+        assert knot.header == header
+        assert knot.stitches == stitches
+        assert knot.stitches_info == stitches_info
+
+    def test_block_name_to_id_property(self):
+        """Test block_name_to_id property"""
+        Node.reset_id_counter()
+
+        stitches_node = Node(
+            node_type=NodeType.STITCHES,
+            raw_content="= village",
+            level=0,
+            line_number=1,
+            name="village",
+        )
+        content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Village content",
+            level=0,
+            line_number=2,
+            content="Village content",
+        )
+
+        stitches = {stitches_node.item_id: {content_node.item_id: content_node}}
+        stitches_info = {stitches_node.item_id: stitches_node}
+
+        knot = RawKnot(header={}, stitches=stitches, stitches_info=stitches_info)
+        name_to_id = knot.block_name_to_id
+        assert "village" in name_to_id
+        assert name_to_id["village"] == content_node.item_id
+
+    def test_get_blocks(self):
+        """Test get_blocks method"""
+        header = {
+            1: Node(
+                node_type=NodeType.BASE,
+                raw_content="Header",
+                level=0,
+                line_number=1,
+                content="Header",
+            )
+        }
+        stitches = {
+            2: {
+                3: Node(
+                    node_type=NodeType.BASE,
+                    raw_content="Stitch content",
+                    level=0,
+                    line_number=2,
+                    content="Stitch content",
+                )
+            }
+        }
+
+        knot = RawKnot(header=header, stitches=stitches, stitches_info={})
+        blocks = knot.get_blocks()
+        assert len(blocks) == 2  # header + 1 stitch
+        assert blocks[0] == header
+        assert blocks[1] == stitches[2]
+
+    def test_first_id_with_header(self):
+        """Test first_id property with header"""
+        node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Header",
+            level=0,
+            line_number=1,
+            content="Header",
+        )
+        header = {node.item_id: node}
+
+        knot = RawKnot(header=header, stitches={}, stitches_info={})
+        assert knot.first_id == node.item_id
+
+    def test_first_id_without_header(self):
+        """Test first_id property without header"""
+        node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Header",
+            level=0,
+            line_number=1,
+            content="Header",
+        )
+        stitches = {2: {node.item_id: node}}
+
+        knot = RawKnot(header={}, stitches=stitches, stitches_info={})
+        assert knot.first_id == node.item_id
+
+    def test_get_node(self):
+        """Test get_node method"""
+        Node.reset_id_counter()
+
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Header",
+            level=0,
+            line_number=1,
+            content="Header",
+        )
+        stitches_info_node = Node(
+            node_type=NodeType.STITCHES,
+            raw_content="= stitch",
+            level=0,
+            line_number=2,
+            name="stitch",
+        )
+        stitch_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Stitch content",
+            level=0,
+            line_number=3,
+            content="Stitch content",
+        )
+
+        header = {header_node.item_id: header_node}
+        stitches_info = {stitches_info_node.item_id: stitches_info_node}
+        stitches = {
+            stitches_info_node.item_id: {
+                stitch_content_node.item_id: stitch_content_node
+            }
+        }
+
+        knot = RawKnot(header=header, stitches=stitches, stitches_info=stitches_info)
+
+        assert knot.get_node(header_node.item_id) == header_node
+        assert knot.get_node(stitches_info_node.item_id) == stitches_info_node
+        assert knot.get_node(stitch_content_node.item_id) == stitch_content_node
+        assert knot.get_node(999) is None
+
+
+class TestRawStory:
+    """Test the RawStory class"""
+
+    def setup_method(self):
+        """Reset ID counter before each test"""
+        Node.reset_id_counter()
+
+    def test_raw_story_creation(self):
+        """Test RawStory creation"""
+        header = {}
+        knots = {}
+        knots_info = {}
+
+        story = RawStory(header=header, knots=knots, knots_info=knots_info)
+        assert story.header == header
+        assert story.knots == knots
+        assert story.knots_info == knots_info
+
+    def test_block_name_to_id_property(self):
+        """Test block_name_to_id property with knots and stitches"""
+        Node.reset_id_counter()
+
+        # Create knot info node
+        knot_info_node = Node(
+            node_type=NodeType.KNOT,
+            raw_content="== forest ==",
+            level=0,
+            line_number=1,
+            name="forest",
+        )
+
+        # Create knot header content
+        knot_header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="You enter the forest",
+            level=0,
+            line_number=2,
+            content="You enter the forest",
+        )
+
+        # Create stitches
+        stitches_info_node = Node(
+            node_type=NodeType.STITCHES,
+            raw_content="= clearing",
+            level=0,
+            line_number=3,
+            name="clearing",
+        )
+
+        stitches_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="A peaceful clearing",
+            level=0,
+            line_number=4,
+            content="A peaceful clearing",
+        )
+
+        # Build the knot structure
+        knot_header = {knot_header_node.item_id: knot_header_node}
+        stitches = {
+            stitches_info_node.item_id: {
+                stitches_content_node.item_id: stitches_content_node
+            }
+        }
+        stitches_info = {stitches_info_node.item_id: stitches_info_node}
+
+        raw_knot = RawKnot(
+            header=knot_header, stitches=stitches, stitches_info=stitches_info
+        )
+
+        knots = {knot_info_node.item_id: raw_knot}
+        knots_info = {knot_info_node.item_id: knot_info_node}
+
+        story = RawStory(header={}, knots=knots, knots_info=knots_info)
+        name_to_id = story.block_name_to_id
+
+        assert "forest" in name_to_id
+        assert name_to_id["forest"] == knot_header_node.item_id
+        assert "forest.clearing" in name_to_id
+        assert name_to_id["forest.clearing"] == stitches_content_node.item_id
+
+    def test_get_node(self):
+        """Test get_node method"""
+        Node.reset_id_counter()
+
+        # Create header node
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Story header",
+            level=0,
+            line_number=1,
+            content="Story header",
+        )
+
+        # Create knot info node
+        knot_info_node = Node(
+            node_type=NodeType.KNOT,
+            raw_content="== chapter1 ==",
+            level=0,
+            line_number=2,
+            name="chapter1",
+        )
+
+        # Create knot content
+        knot_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Chapter begins",
+            level=0,
+            line_number=3,
+            content="Chapter begins",
+        )
+
+        header = {header_node.item_id: header_node}
+        knots_info = {knot_info_node.item_id: knot_info_node}
+        raw_knot = RawKnot(
+            header={knot_content_node.item_id: knot_content_node},
+            stitches={},
+            stitches_info={},
+        )
+        knots = {knot_info_node.item_id: raw_knot}
+
+        story = RawStory(header=header, knots=knots, knots_info=knots_info)
+
+        assert story.get_node(header_node.item_id) == header_node
+        assert story.get_node(knot_info_node.item_id) == knot_info_node
+        assert story.get_node(knot_content_node.item_id) == knot_content_node
+        assert story.get_node(999) is None
+
+
 class TestCleanLines:
     """Test the clean_lines function"""
 
@@ -321,15 +813,19 @@ class TestCleanLines:
     def test_empty_input(self):
         """Test with empty input"""
         result = clean_lines("")
-        assert result == {}
+        assert isinstance(result, RawStory)
+        assert result.header == {}
+        assert result.knots == {}
+        assert result.knots_info == {}
 
     def test_single_base_content(self):
         """Test with single base content line"""
         ink_code = "Hello world"
         result = clean_lines(ink_code)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
+        assert isinstance(result, RawStory)
+        assert len(result.header) == 1
+        node = next(iter(result.header.values()))
         assert node.node_type == NodeType.BASE
         assert node.content == "Hello world"
         assert node.raw_content == "Hello world"
@@ -341,8 +837,9 @@ class TestCleanLines:
         ink_code = "* First choice"
         result = clean_lines(ink_code)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
+        assert isinstance(result, RawStory)
+        assert len(result.header) == 1
+        node = next(iter(result.header.values()))
         assert node.node_type == NodeType.CHOICE
         assert node.content == "First choice"
         assert node.level == 1
@@ -352,164 +849,243 @@ class TestCleanLines:
         ink_code = "- First gather"
         result = clean_lines(ink_code)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
+        assert isinstance(result, RawStory)
+        assert len(result.header) == 1
+        node = next(iter(result.header.values()))
         assert node.node_type == NodeType.GATHER
         assert node.content == "First gather"
         assert node.level == 1
 
-    def test_consecutive_base_content_merge(self):
-        """Test that consecutive base content lines are merged"""
-        ink_code = """First line
-Second line
-Third line"""
+    def test_choice_with_brackets_parsed(self):
+        """Test that choices with brackets are properly parsed"""
+        ink_code = "* [Open door] You open the door"
         result = clean_lines(ink_code)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
-        assert node.node_type == NodeType.BASE
-        assert node.content == "First line Second line Third line"
-        assert node.raw_content == "First line\nSecond line\nThird line"
-        assert node.line_number == 1  # Should keep the first line number
-        assert node.level == 0
+        assert len(result.header) == 1
+        node = next(iter(result.header.values()))
+        assert node.node_type == NodeType.CHOICE
+        assert node.choice_text == "Open door"
+        assert node.content == " You open the door"
 
-    def test_base_content_merge_custom_separator(self):
-        """Test base content merge with custom separator"""
-        ink_code = """First line
-Second line"""
-        result = clean_lines(ink_code, clean_text_sep=" | ")
-
-        assert len(result) == 1
-        node = next(iter(result.values()))
-        assert node.content == "First line | Second line"
-
-    def test_mixed_content_no_merge(self):
-        """Test that non-base content doesn't merge"""
-        ink_code = """Base content
-* Choice
-- Gather"""
+    def test_choice_with_divert(self):
+        """Test choice with divert creates additional divert node"""
+        ink_code = "* Go to forest -> forest_path"
         result = clean_lines(ink_code)
 
-        assert len(result) == 3
-        nodes = list(result.values())
+        assert len(result.header) == 2  # choice + divert
+        nodes = list(result.header.values())
 
-        # Should be in order of creation
-        assert nodes[0].node_type == NodeType.BASE
-        assert nodes[0].content == "Base content"
+        # Find choice and divert nodes
+        choice_node = next(n for n in nodes if n.node_type == NodeType.CHOICE)
+        divert_node = next(n for n in nodes if n.node_type == NodeType.DIVERT)
 
-        assert nodes[1].node_type == NodeType.CHOICE
-        assert nodes[1].content == "Choice"
+        assert choice_node.content == "Go to forest"
+        assert divert_node.name == "forest_path"
 
-        assert nodes[2].node_type == NodeType.GATHER
-        assert nodes[2].content == "Gather"
+    def test_knot_structure(self):
+        """Test parsing with knots"""
+        ink_code = """Opening text
+== forest ==
+You enter the forest.
+* Look around
+* Walk deeper"""
 
-    def test_base_content_interrupted_by_choice(self):
-        """Test base content merge interrupted by choice"""
-        ink_code = """First base
-Second base
-* Choice
-Third base"""
         result = clean_lines(ink_code)
 
-        assert len(result) == 2
-        nodes = list(result.values())
+        assert len(result.header) == 1  # opening text
+        assert len(result.knots_info) == 1  # forest knot info
+        assert len(result.knots) == 1  # forest knot
 
-        # First merged base content
-        assert nodes[0].node_type == NodeType.BASE
-        assert nodes[0].content == "First base Second base"
+        # Check header
+        header_node = next(iter(result.header.values()))
+        assert header_node.content == "Opening text"
 
-        # Choice
-        assert nodes[1].node_type == NodeType.CHOICE
-        assert nodes[1].content == "Choice Third base"
+        # Check knot info
+        knot_info = next(iter(result.knots_info.values()))
+        assert knot_info.node_type == NodeType.KNOT
+        assert knot_info.name == "forest"
 
-    def test_skip_empty_lines(self):
-        """Test that empty lines are skipped"""
-        ink_code = """First line
+        # Check knot content
+        knot = next(iter(result.knots.values()))
+        assert len(knot.header) == 3  # "You enter..." + 2 choices
 
-Second line"""
+    def test_stitches_structure(self):
+        """Test parsing with stitches"""
+        ink_code = """== main_knot ==
+Knot header text
+= stitch_one
+Stitch one content
+= stitch_two
+Stitch two content"""
+
         result = clean_lines(ink_code)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
-        assert node.content == "First line Second line"
+        assert len(result.knots_info) == 1
+        knot = next(iter(result.knots.values()))
 
-    def test_skip_comments(self):
-        """Test that comment lines are skipped"""
+        assert len(knot.header) == 1  # knot header text
+        assert len(knot.stitches_info) == 2  # two stitches
+        assert len(knot.stitches) == 2  # two stitch content blocks
+
+        # Check stitches names
+        stitch_names = [stitch.name for stitch in knot.stitches_info.values()]
+        assert "stitch_one" in stitch_names
+        assert "stitch_two" in stitch_names
+
+    def test_consecutive_base_content_merge_in_choice_gather(self):
+        """Test that consecutive base content merges with choice/gather"""
+        ink_code = """* First choice
+  Choice continuation
+- Gather point
+  Gather continuation"""
+
+        result = clean_lines(ink_code)
+
+        nodes = list(result.header.values())
+        choice_node = next(n for n in nodes if n.node_type == NodeType.CHOICE)
+        gather_node = next(n for n in nodes if n.node_type == NodeType.GATHER)
+
+        assert "First choice Choice continuation" in choice_node.content
+        assert "Gather point Gather continuation" in gather_node.content
+
+    def test_skip_comments_and_directives(self):
+        """Test that comments and directives are skipped"""
         ink_code = """First line
 // This is a comment
+-> SOME_DIRECTIVE
 Second line"""
+
         result = clean_lines(ink_code)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
-        assert node.content == "First line Second line"
+        # Should have base content + divert node
+        assert len(result.header) == 3
+        nodes = list(result.header.values())
 
-    def test_skip_directives(self):
-        """Test that directive lines are skipped"""
-        ink_code = """First line
--> END
-Second line"""
-        result = clean_lines(ink_code)
+        base_node = next(n for n in nodes if n.node_type == NodeType.BASE)
+        divert_node = next(n for n in nodes if n.node_type == NodeType.DIVERT)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
-        assert node.content == "First line Second line"
+        assert "First line" in base_node.content
+        assert divert_node.name == "SOME_DIRECTIVE"
 
     def test_complex_ink_structure(self):
         """Test complex Ink structure with various elements"""
         ink_code = """Opening text
 More opening text
 
-// Comment should be ignored
-* First choice
-  Choice continuation
-* Second choice
-- Gather point
-  Gather continuation
+== forest_chapter ==
+You enter a dark forest.
 
--> END
+= clearing
+* [Look around] You see a peaceful clearing.
+* [Listen carefully] You hear birds singing.
 
-Final text"""
+= deep_woods  
+- You venture deeper into the woods.
+  The path becomes unclear.
+
+== village_chapter ==
+You arrive at a small village."""
+
         result = clean_lines(ink_code)
 
-        assert len(result) == 4
-        nodes = list(result.values())
+        # Check header
+        assert len(result.header) == 1
+        header_node = next(iter(result.header.values()))
+        assert "Opening text More opening text" in header_node.content
 
-        # Merged opening text
-        assert nodes[0].node_type == NodeType.BASE
-        assert nodes[0].content == "Opening text More opening text"
+        # Check knots
+        assert len(result.knots_info) == 2
+        knot_names = [knot.name for knot in result.knots_info.values()]
+        assert "forest_chapter" in knot_names
+        assert "village_chapter" in knot_names
 
-        # First choice with continuation
-        assert nodes[1].node_type == NodeType.CHOICE
-        assert nodes[1].content == "First choice Choice continuation"
+        # Check forest knot structure
+        forest_knot_id = next(
+            knot_id
+            for knot_id, knot_info in result.knots_info.items()
+            if knot_info.name == "forest_chapter"
+        )
+        forest_knot = result.knots[forest_knot_id]
 
-        # Second choice
-        assert nodes[2].node_type == NodeType.CHOICE
-        assert nodes[2].content == "Second choice"
+        # Should have knot header + 2 stitches
+        assert len(forest_knot.header) == 1
+        assert len(forest_knot.stitches_info) == 2
 
-        # Gather with continuation
-        assert nodes[3].node_type == NodeType.GATHER
-        assert nodes[3].content == "Gather point Gather continuation Final text"
+        stitch_names = [stitch.name for stitch in forest_knot.stitches_info.values()]
+        assert "clearing" in stitch_names
+        assert "deep_woods" in stitch_names
+
+    def test_custom_separator(self):
+        """Test base content merge with custom separator"""
+        ink_code = """First line
+Second line"""
+        result = clean_lines(ink_code, clean_text_sep=" | ")
+
+        node = next(iter(result.header.values()))
+        assert node.content == "First line | Second line"
 
     def test_only_skipped_lines(self):
         """Test with only lines that should be skipped"""
         ink_code = """
 // Comment 1
--> DONE
 // Comment 2
 
 """
         result = clean_lines(ink_code)
-        assert result == {}
+        assert result.header == {}
+        assert result.knots == {}
+        assert result.knots_info == {}
 
     def test_whitespace_handling(self):
         """Test proper whitespace handling in input"""
         ink_code = "  \n  First line  \n  \n  Second line  \n  "
         result = clean_lines(ink_code)
 
-        assert len(result) == 1
-        node = next(iter(result.values()))
-        assert node.content == "First line Second line"
+        assert len(result.header) == 1
+        node = next(iter(result.header.values()))
+        assert "First line Second line" in node.content
+
+    def test_divert_parsing(self):
+        """Test that divert lines create proper DIVERT nodes"""
+        ink_code = """Some content
+-> END
+More content"""
+
+        result = clean_lines(ink_code)
+
+        nodes = list(result.header.values())
+        assert len(nodes) == 3
+
+        # Should have base, divert, base
+        node_types = [node.node_type for node in nodes]
+        assert NodeType.BASE in node_types
+        assert NodeType.DIVERT in node_types
+
+        divert_node = next(n for n in nodes if n.node_type == NodeType.DIVERT)
+        assert divert_node.name == "END"
+
+    def test_block_name_to_id_integration(self):
+        """Test block_name_to_id property with full story"""
+        ink_code = """== main ==
+Main content
+= sub_section
+Sub content"""
+
+        result = clean_lines(ink_code)
+        name_to_id = result.block_name_to_id
+
+        assert "main" in name_to_id
+        assert "main.sub_section" in name_to_id
+
+        # Verify IDs point to correct nodes
+        main_id = name_to_id["main"]
+        sub_id = name_to_id["main.sub_section"]
+
+        main_node = result.get_node(main_id)
+        sub_node = result.get_node(sub_id)
+
+        assert main_node.content == "Main content"
+        assert sub_node.content == "Sub content"
 
 
 class TestIntegration:
@@ -529,56 +1105,125 @@ There's a door to your left and a window to your right.
 - You hesitate for a moment.
   What will you choose?
 
+== door_path ==
+You open the door and step into a hallway.
+
+== window_path ==  
+You look out the window and see a garden.
+
 // This is a comment
 -> DONE"""
 
         result = clean_lines(ink_code)
 
-        # Should have 4 nodes (merged base content, two choices, merged gather)
-        assert len(result) == 4
+        # Should have header, 2 knots, and divert
+        assert len(result.header) > 0
+        assert len(result.knots_info) == 2
 
-        nodes = list(result.values())
+        # Check knot names
+        knot_names = [knot.name for knot in result.knots_info.values()]
+        assert "door_path" in knot_names
+        assert "window_path" in knot_names
 
-        # Check the structure
-        assert nodes[0].node_type == NodeType.BASE
-        assert "You wake up" in nodes[0].content
-        assert "There's a door" in nodes[0].content
+        # Check that choices have proper divert nodes
+        header_nodes = list(result.header.values())
+        choice_nodes = [n for n in header_nodes if n.node_type == NodeType.CHOICE]
+        divert_nodes = [n for n in header_nodes if n.node_type == NodeType.DIVERT]
 
-        assert nodes[1].node_type == NodeType.CHOICE
-        assert nodes[1].content == " -> door_path"
-        assert nodes[1].choice_text == "Open the door"
-        assert nodes[1].level == 1
-
-        assert nodes[2].node_type == NodeType.CHOICE
-        assert nodes[2].content == " -> window_path"
-        assert nodes[2].choice_text == "Look out the window"
-        assert nodes[2].level == 1
-
-        assert nodes[3].node_type == NodeType.GATHER
-        assert "You hesitate" in nodes[3].content
-        assert "What will you choose" in nodes[3].content
-        assert nodes[3].level == 1
+        assert len(choice_nodes) == 2
+        assert len(divert_nodes) >= 2  # At least choice diverts + final DONE
 
     def test_node_id_consistency(self):
         """Test that node IDs remain consistent throughout processing"""
         ink_code = """First
 * Choice
+== knot ==
 Second
 Third"""
 
         result = clean_lines(ink_code)
 
-        # Get the nodes in creation order
-        sorted_nodes = sorted(result.items(), key=lambda x: x[0])
+        # Collect all nodes
+        all_nodes = []
+        all_nodes.extend(result.header.values())
+        all_nodes.extend(result.knots_info.values())
+        for knot in result.knots.values():
+            all_nodes.extend(knot.header.values())
+            all_nodes.extend(knot.stitches_info.values())
+            for stitch in knot.stitches.values():
+                all_nodes.extend(stitch.values())
 
-        # IDs should be sequential
-        assert sorted_nodes[0][0] == sorted_nodes[0][1].item_id
-        assert sorted_nodes[1][0] == sorted_nodes[1][1].item_id
-
-        # And should be 1, 2 (after merging, some nodes are deleted and recreated)
-        ids = [node_id for node_id, node in sorted_nodes]
-        # The exact IDs depend on the merging process, but they should be unique
+        # Check that all IDs are unique
+        ids = [node.item_id for node in all_nodes]
         assert len(set(ids)) == len(ids)  # All unique
+
+    def test_parse_choice_and_divert_integration(self):
+        """Test integration of choice parsing and divert creation"""
+        ink_code = "* [Take the sword] You pick up the gleaming sword. -> combat"
+        result = clean_lines(ink_code)
+
+        nodes = list(result.header.values())
+        choice_node = next(n for n in nodes if n.node_type == NodeType.CHOICE)
+        divert_node = next(n for n in nodes if n.node_type == NodeType.DIVERT)
+
+        # Choice should be parsed for brackets
+        assert choice_node.choice_text == "Take the sword"
+        assert choice_node.content == " You pick up the gleaming sword."
+
+        # Divert should be created
+        assert divert_node.name == "combat"
+
+    def test_complex_nesting_structure(self):
+        """Test complex nested structure with multiple levels"""
+        ink_code = """== prologue ==
+The story begins...
+
+= introduction
+You are the hero.
+* Accept the quest
+** Eagerly
+** Reluctantly  
+* Decline the quest
+
+= conclusion
+The introduction ends.
+
+== chapter_one ==
+Chapter one begins."""
+
+        result = clean_lines(ink_code)
+
+        # Verify structure
+        assert len(result.knots_info) == 2
+
+        prologue_knot_id = next(
+            knot_id
+            for knot_id, knot_info in result.knots_info.items()
+            if knot_info.name == "prologue"
+        )
+        prologue_knot = result.knots[prologue_knot_id]
+
+        # Check stitches
+        assert len(prologue_knot.stitches_info) == 2
+        stitch_names = [stitch.name for stitch in prologue_knot.stitches_info.values()]
+        assert "introduction" in stitch_names
+        assert "conclusion" in stitch_names
+
+        # Check that nested choices have proper levels
+        introduction_stitch_id = next(
+            stitch_id
+            for stitch_id, stitch_info in prologue_knot.stitches_info.items()
+            if stitch_info.name == "introduction"
+        )
+        introduction_nodes = list(
+            prologue_knot.stitches[introduction_stitch_id].values()
+        )
+
+        choice_nodes = [n for n in introduction_nodes if n.node_type == NodeType.CHOICE]
+        choice_levels = [n.level for n in choice_nodes]
+
+        assert 1 in choice_levels  # Single star choices
+        assert 2 in choice_levels  # Double star choices
 
 
 # Fixtures for common test data
@@ -604,16 +1249,48 @@ def complex_ink_code():
 The path splits in three directions.
 
 // Player choices
-* [Go north] You head north into the forest.
+* [Go north] You head north into the forest. -> forest
 ** [Follow the river] The river leads to a village.
 ** [Climb the mountain] The mountain path is treacherous.
-* [Go east] You walk east toward the sunrise.
-* [Go west] You turn west toward the setting sun.
+* [Go east] You walk east toward the sunrise. -> eastern_path
+* [Go west] You turn west toward the setting sun. -> western_path
 
 - After making your choice, you reflect on the decision.
   The journey ahead seems uncertain.
+
+== forest ==
+You are now in the deep forest.
+
+= river_section
+The river flows peacefully here.
+
+= mountain_section  
+The mountain looms above you.
+
+== eastern_path ==
+The eastern path leads to adventure.
+
+== western_path ==
+The western path leads to mystery.
 
 // End of section
 -> DONE
 
 Epilogue text that comes after."""
+
+
+@pytest.fixture
+def knot_with_stitches():
+    """Ink code with knots and stitches"""
+    return """== main_story ==
+This is the main story beginning.
+
+= first_section
+Content of the first section.
+* Choice in first section
+
+= second_section
+Content of the second section.
+- Gather in second section
+
+Final content in main story."""

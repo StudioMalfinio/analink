@@ -2,7 +2,9 @@ from typing import Optional
 
 import networkx as nx
 
-from analink.parser.node import Node, NodeType
+from analink.parser.node import Node, NodeType, RawKnot, RawStory
+
+KEY_KNOT_NAME = {"END": -1, "BEGIN": -2, "AUTO_END": -3}
 
 
 def find_leaves_from_node(
@@ -25,10 +27,11 @@ def find_leaves_from_node(
     return leaves
 
 
-def parse_story(
+def parse_base_block(
     nodes: dict[int, Node],
-    verbose=False,
-) -> list[tuple[int, int]]:
+    local_block_name_to_id: dict[str, int],
+    global_block_name_to_id: dict[str, int],
+):
     """
     return the edges
     """
@@ -63,7 +66,6 @@ def parse_story(
         elif node.node_type is NodeType.GATHER:
             # for every leaves of node in node_at_level[node.level] -> add the edge node.item_id->item_id
             if node.level in node_at_level:
-
                 for level_node_item_id in node_at_level[node.level]:
                     # Find all leaves (descendants with no outgoing edges) from this node
                     leaves = find_leaves_from_node(level_node_item_id, edges)
@@ -75,8 +77,92 @@ def parse_story(
                 node_at_level[node.level - 1] = [item_id]
             else:
                 node_at_level[node.level - 1][-1] = item_id
-
+        elif node.node_type is NodeType.DIVERT:
+            # this is the children of the previous node which should be in node_at_level[node.level][-1]
+            if node.level in node_at_level and len(node_at_level[node.level]) > 0:
+                if node.name in local_block_name_to_id:
+                    edges.append(
+                        (
+                            node_at_level[node.level][-1],
+                            local_block_name_to_id[node.name],
+                        )
+                    )
+                elif node.name in global_block_name_to_id:
+                    edges.append(
+                        (
+                            node_at_level[node.level][-1],
+                            global_block_name_to_id[node.name],
+                        )
+                    )
+                elif node.name in KEY_KNOT_NAME:
+                    edges.append(
+                        (
+                            node_at_level[node.level][-1],
+                            KEY_KNOT_NAME[node.name],
+                        )
+                    )
+                else:
+                    raise NotImplementedError("IMPLEMENT THE PARSING ERROR")
+            else:
+                # high chance we are at the start
+                if node.level == 0:
+                    if node.name in local_block_name_to_id:
+                        edges.append(
+                            (
+                                -2,
+                                local_block_name_to_id[node.name],
+                            )
+                        )
+                    elif node.name in global_block_name_to_id:
+                        edges.append(
+                            (
+                                -2,
+                                global_block_name_to_id[node.name],
+                            )
+                        )
+                    elif node.name in KEY_KNOT_NAME:
+                        edges.append(
+                            (
+                                -2,
+                                KEY_KNOT_NAME[node.name],
+                            )
+                        )
+                    else:
+                        raise NotImplementedError("IMPLEMENT THE PARSING ERROR")
+                else:
+                    # raise ParsingError("the divert has no available parent")
+                    raise NotImplementedError("IMPLEMENT THE PARSING ERROR SECOND?")
     return edges
+
+
+def parse_knot(raw_knot: RawKnot, global_block_name_to_id: dict[str, int]):
+    blocks = raw_knot.get_blocks()
+    local_block_name_to_id = raw_knot.block_name_to_id
+    final_edges = []
+    final_nodes = {}
+    for nodes in blocks:
+        edges = parse_base_block(nodes, local_block_name_to_id, global_block_name_to_id)
+        final_nodes.update(nodes)
+        final_edges.extend(edges)
+    return final_nodes, final_edges
+
+
+def parse_story(raw_story: RawStory):
+    global_block_name_to_id = raw_story.block_name_to_id
+    final_nodes = {}
+    final_edges = []
+    if len(raw_story.header) > 0:
+        edges = parse_base_block(raw_story.header, {}, global_block_name_to_id)
+        final_nodes.update(raw_story.header)
+        final_edges.extend(edges)
+    for knot in raw_story.knots.values():
+        nodes, edges = parse_knot(knot, global_block_name_to_id)
+        final_nodes.update(nodes)
+        final_edges.extend(edges)
+    final_nodes[-1] = Node.end_node()
+    final_nodes[-2] = Node.begin_node()
+    final_nodes[-3] = Node.auto_end_node()
+    return final_nodes, final_edges
 
 
 def escape_mermaid_text(text: Optional[str]) -> str:
@@ -101,9 +187,9 @@ def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> st
 
     # Add all nodes
     for node_id, node in nodes.items():
-        content = (
-            node.content.replace('"', "'").replace("\n", " ") if node.content else ""
-        )
+        if node.content is None:
+            continue
+        content = node.content.replace('"', "'").replace("\n", " ")
         if len(content) > 50:
             content = content[:47] + "..."
         if node.node_type is NodeType.CHOICE:

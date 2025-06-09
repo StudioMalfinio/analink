@@ -3,11 +3,15 @@ from unittest.mock import patch
 import pytest
 
 from analink.parser.graph_story import (
+    KEY_KNOT_NAME,
+    escape_mermaid_text,
     find_leaves_from_node,
     graph_to_mermaid,
+    parse_base_block,
+    parse_knot,
     parse_story,
 )
-from analink.parser.node import Node, NodeType
+from analink.parser.node import Node, NodeType, RawKnot, RawStory
 
 
 class TestFindLeavesFromNode:
@@ -86,8 +90,47 @@ class TestFindLeavesFromNode:
         assert result == [2]  # Should only find leaves reachable from 1
 
 
-class TestParseStory:
-    """Test the parse_story function"""
+class TestEscapeMermaidText:
+    """Test the escape_mermaid_text function"""
+
+    def test_empty_string(self):
+        """Test with empty string"""
+        assert escape_mermaid_text("") == ""
+
+    def test_none_input(self):
+        """Test with None input"""
+        assert escape_mermaid_text(None) == ""
+
+    def test_double_quotes(self):
+        """Test escaping double quotes"""
+        assert escape_mermaid_text('Say "hello"') == "Say &quot;hello&quot;"
+
+    def test_single_quotes(self):
+        """Test escaping single quotes"""
+        assert escape_mermaid_text("Say 'hello'") == "Say &#39;hello&#39;"
+
+    def test_newlines(self):
+        """Test replacing newlines with spaces"""
+        assert escape_mermaid_text("Line 1\nLine 2") == "Line 1 Line 2"
+
+    def test_pipe_characters(self):
+        """Test escaping pipe characters"""
+        assert escape_mermaid_text("Option A | Option B") == "Option A &#124; Option B"
+
+    def test_multiple_special_chars(self):
+        """Test text with multiple special characters"""
+        text = 'Say "hello" | Go\nforward'
+        expected = "Say &quot;hello&quot; &#124; Go forward"
+        assert escape_mermaid_text(text) == expected
+
+    def test_normal_text(self):
+        """Test normal text without special characters"""
+        text = "Normal text without special characters"
+        assert escape_mermaid_text(text) == text
+
+
+class TestParseBaseBlock:
+    """Test the parse_base_block function"""
 
     def setup_method(self):
         """Reset Node ID counter before each test"""
@@ -95,7 +138,7 @@ class TestParseStory:
 
     def test_empty_nodes(self):
         """Test with empty nodes dictionary"""
-        result = parse_story({})
+        result = parse_base_block({}, {}, {})
         assert result == []
 
     def test_single_base_node(self):
@@ -109,62 +152,76 @@ class TestParseStory:
         )
         nodes = {node.item_id: node}
 
-        result = parse_story(nodes)
+        result = parse_base_block(nodes, {}, {})
         assert result == []  # No edges for single node
-
-    def test_multiple_base_nodes_same_level(self):
-        """Test multiple base nodes at same level"""
-        node1 = Node(
-            node_type=NodeType.BASE, raw_content="Base 1", level=0, line_number=1
-        )
-        node2 = Node(
-            node_type=NodeType.BASE, raw_content="Base 2", level=0, line_number=2
-        )
-
-        nodes = {node1.item_id: node1, node2.item_id: node2}
-
-        result = parse_story(nodes)
-        assert result == []  # No connections between same-level base nodes
 
     def test_base_nodes_different_levels(self):
         """Test base nodes at different levels"""
         node1 = Node(
-            node_type=NodeType.BASE, raw_content="Base 1", level=0, line_number=1
+            node_type=NodeType.BASE,
+            raw_content="Base 1",
+            level=0,
+            line_number=1,
+            content="Base 1",
         )
         node2 = Node(
-            node_type=NodeType.BASE, raw_content="Base 2", level=1, line_number=2
+            node_type=NodeType.BASE,
+            raw_content="Base 2",
+            level=1,
+            line_number=2,
+            content="Base 2",
         )
 
         nodes = {node1.item_id: node1, node2.item_id: node2}
 
-        result = parse_story(nodes)
+        result = parse_base_block(nodes, {}, {})
         # Should connect level 0 to level 1
         assert result == [(node1.item_id, node2.item_id)]
 
-    def test_single_choice_node(self):
-        """Test with single choice node"""
+    def test_choice_connection(self):
+        """Test choice node connection"""
         base_node = Node(
-            node_type=NodeType.BASE, raw_content="Base", level=0, line_number=1
+            node_type=NodeType.BASE,
+            raw_content="Base",
+            level=0,
+            line_number=1,
+            content="Base",
         )
         choice_node = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice", level=1, line_number=2
+            node_type=NodeType.CHOICE,
+            raw_content="* Choice",
+            level=1,
+            line_number=2,
+            content="Choice",
         )
 
         nodes = {base_node.item_id: base_node, choice_node.item_id: choice_node}
 
-        result = parse_story(nodes)
+        result = parse_base_block(nodes, {}, {})
         assert result == [(base_node.item_id, choice_node.item_id)]
 
     def test_multiple_choices_same_level(self):
         """Test multiple choices at same level"""
         base_node = Node(
-            node_type=NodeType.BASE, raw_content="Base", level=0, line_number=1
+            node_type=NodeType.BASE,
+            raw_content="Base",
+            level=0,
+            line_number=1,
+            content="Base",
         )
         choice1 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 1", level=1, line_number=2
+            node_type=NodeType.CHOICE,
+            raw_content="* Choice 1",
+            level=1,
+            line_number=2,
+            content="Choice 1",
         )
         choice2 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 2", level=1, line_number=3
+            node_type=NodeType.CHOICE,
+            raw_content="* Choice 2",
+            level=1,
+            line_number=3,
+            content="Choice 2",
         )
 
         nodes = {
@@ -173,215 +230,463 @@ class TestParseStory:
             choice2.item_id: choice2,
         }
 
-        result = parse_story(nodes)
+        result = parse_base_block(nodes, {}, {})
         expected = [
             (base_node.item_id, choice1.item_id),
             (base_node.item_id, choice2.item_id),
         ]
         assert result == expected
 
-    def test_nested_choices(self):
-        """Test nested choices at different levels"""
-        base_node = Node(
-            node_type=NodeType.BASE, raw_content="Base", level=0, line_number=1
-        )
+    def test_gather_node_functionality(self):
+        """Test gather node connects to same-level nodes"""
         choice1 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 1", level=1, line_number=2
+            node_type=NodeType.CHOICE,
+            raw_content="* Choice 1",
+            level=1,
+            line_number=1,
+            content="Choice 1",
         )
         choice2 = Node(
             node_type=NodeType.CHOICE,
-            raw_content="** Nested choice",
-            level=2,
-            line_number=3,
-        )
-
-        nodes = {
-            base_node.item_id: base_node,
-            choice1.item_id: choice1,
-            choice2.item_id: choice2,
-        }
-
-        result = parse_story(nodes)
-        expected = [
-            (base_node.item_id, choice1.item_id),
-            (choice1.item_id, choice2.item_id),
-        ]
-        assert result == expected
-
-    def test_gather_node_simple(self):
-        """Test simple gather node"""
-        choice1 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 1", level=1, line_number=1
-        )
-        choice2 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 2", level=1, line_number=2
+            raw_content="* Choice 2",
+            level=1,
+            line_number=2,
+            content="Choice 2",
         )
         gather = Node(
-            node_type=NodeType.GATHER, raw_content="- Gather", level=1, line_number=3
-        )
-
-        nodes = {
-            choice1.item_id: choice1,
-            choice2.item_id: choice2,
-            gather.item_id: gather,
-        }
-
-        with patch(
-            "analink.parser.graph_story.find_leaves_from_node"
-        ) as mock_find_leaves:
-            # Mock the find_leaves_from_node function
-            mock_find_leaves.side_effect = lambda node_id, edges: [
-                node_id
-            ]  # Each node is its own leaf
-
-            result = parse_story(nodes)
-
-            # Should have edges from both choices to gather
-            expected_edges = [
-                (choice1.item_id, gather.item_id),
-                (choice2.item_id, gather.item_id),
-            ]
-            assert all(edge in result for edge in expected_edges)
-
-    def test_gather_node_with_complex_structure(self):
-        """Test gather node with complex preceding structure"""
-        base_node = Node(
-            node_type=NodeType.BASE, raw_content="Base", level=0, line_number=1
-        )
-        choice1 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 1", level=1, line_number=2
-        )
-        choice2 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 2", level=1, line_number=3
-        )
-        nested_choice = Node(
-            node_type=NodeType.CHOICE, raw_content="** Nested", level=2, line_number=4
-        )
-        gather = Node(
-            node_type=NodeType.GATHER, raw_content="- Gather", level=1, line_number=5
-        )
-
-        nodes = {
-            base_node.item_id: base_node,
-            choice1.item_id: choice1,
-            choice2.item_id: choice2,
-            nested_choice.item_id: nested_choice,
-            gather.item_id: gather,
-        }
-
-        # Mock find_leaves_from_node to return expected leaves
-        with patch(
-            "analink.parser.graph_story.find_leaves_from_node"
-        ) as mock_find_leaves:
-
-            def mock_leaves(node_id, edges):
-                # choice1 leads to nested_choice, so nested_choice is the leaf
-                if node_id == choice1.item_id:
-                    return [nested_choice.item_id]
-                # choice2 is its own leaf
-                elif node_id == choice2.item_id:
-                    return [choice2.item_id]
-                else:
-                    return [node_id]
-
-            mock_find_leaves.side_effect = mock_leaves
-
-            result = parse_story(nodes)
-
-            # Verify that gather gets connected to leaves
-            gather_edges = [
-                (nested_choice.item_id, gather.item_id),
-                (choice2.item_id, gather.item_id),
-            ]
-            assert all(edge in result for edge in gather_edges)
-
-    def test_gather_node_level_manipulation(self):
-        """Test that gather node properly manipulates level structure"""
-        choice1 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice 1", level=1, line_number=1
-        )
-        gather = Node(
-            node_type=NodeType.GATHER, raw_content="- Gather", level=1, line_number=2
-        )
-        next_choice = Node(
-            node_type=NodeType.CHOICE,
-            raw_content="* Next choice",
+            node_type=NodeType.GATHER,
+            raw_content="- Gather",
             level=1,
             line_number=3,
+            content="Gather",
         )
 
         nodes = {
             choice1.item_id: choice1,
+            choice2.item_id: choice2,
             gather.item_id: gather,
-            next_choice.item_id: next_choice,
         }
 
-        with patch(
-            "analink.parser.graph_story.find_leaves_from_node"
-        ) as mock_find_leaves:
-            mock_find_leaves.return_value = [choice1.item_id]
+        result = parse_base_block(nodes, {}, {})
 
-            result = parse_story(nodes)
+        # Should have edges from both choices to gather
+        expected_edges = [
+            (choice1.item_id, gather.item_id),
+            (choice2.item_id, gather.item_id),
+        ]
+        assert all(edge in result for edge in expected_edges)
 
-            # Should connect choice1 to gather, and gather should be at level 0 for next connections
-            assert (choice1.item_id, gather.item_id) in result
-            assert (gather.item_id, next_choice.item_id) in result
-
-    def test_verbose_parameter(self):
-        """Test that verbose parameter doesn't affect functionality"""
-        node = Node(node_type=NodeType.BASE, raw_content="Base", level=0, line_number=1)
-        nodes = {node.item_id: node}
-
-        result_false = parse_story(nodes, verbose=False)
-        result_true = parse_story(nodes, verbose=True)
-
-        assert result_false == result_true
-
-    def test_max_level_tracking(self):
-        """Test that max_level_seen is properly tracked"""
-        node1 = Node(
-            node_type=NodeType.BASE, raw_content="Base", level=0, line_number=1
+    def test_divert_to_local_block(self):
+        """Test divert to local block"""
+        base_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Base",
+            level=0,
+            line_number=1,
+            content="Base",
         )
-        node2 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice", level=3, line_number=2
+        divert_node = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> target",
+            level=0,
+            line_number=2,
+            name="target",
         )
-        node3 = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice", level=1, line_number=3
+        target_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Target",
+            level=0,
+            line_number=3,
+            content="Target",
         )
 
-        nodes = {node1.item_id: node1, node2.item_id: node2, node3.item_id: node3}
+        nodes = {
+            base_node.item_id: base_node,
+            divert_node.item_id: divert_node,
+            target_node.item_id: target_node,
+        }
 
-        # This should work without errors (max_level_seen should be 3)
-        result = parse_story(nodes)
-        assert isinstance(result, list)
+        local_block_name_to_id = {"target": target_node.item_id}
 
-    def test_choice_without_previous_level(self):
-        """Test choice node without previous level"""
-        choice = Node(
-            node_type=NodeType.CHOICE, raw_content="* Choice", level=1, line_number=1
+        result = parse_base_block(nodes, local_block_name_to_id, {})
+
+        # Should connect base to target via divert
+        assert (base_node.item_id, target_node.item_id) in result
+
+    def test_divert_to_global_block(self):
+        """Test divert to global block"""
+        base_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Base",
+            level=0,
+            line_number=1,
+            content="Base",
         )
-        nodes = {choice.item_id: choice}
-
-        result = parse_story(nodes)
-        assert result == []  # No previous level to connect to
-
-    def test_base_without_previous_level(self):
-        """Test base node without previous level"""
-        base = Node(node_type=NodeType.BASE, raw_content="Base", level=1, line_number=1)
-        nodes = {base.item_id: base}
-
-        result = parse_story(nodes)
-        assert result == []  # No previous level to connect to
-
-    def test_gather_without_same_level_nodes(self):
-        """Test gather node when no nodes exist at the same level"""
-        gather = Node(
-            node_type=NodeType.GATHER, raw_content="- Gather", level=1, line_number=1
+        divert_node = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> global_target",
+            level=0,
+            line_number=2,
+            name="global_target",
         )
-        nodes = {gather.item_id: gather}
 
-        result = parse_story(nodes)
-        assert result == []
+        nodes = {
+            base_node.item_id: base_node,
+            divert_node.item_id: divert_node,
+        }
+
+        global_block_name_to_id = {"global_target": 999}
+
+        result = parse_base_block(nodes, {}, global_block_name_to_id)
+
+        # Should connect base to global target
+        assert (base_node.item_id, 999) in result
+
+    def test_divert_to_key_knot(self):
+        """Test divert to key knot (END, BEGIN, etc.)"""
+        base_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Base",
+            level=0,
+            line_number=1,
+            content="Base",
+        )
+        divert_node = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> END",
+            level=0,
+            line_number=2,
+            name="END",
+        )
+
+        nodes = {
+            base_node.item_id: base_node,
+            divert_node.item_id: divert_node,
+        }
+
+        result = parse_base_block(nodes, {}, {})
+
+        # Should connect base to END (-1)
+        assert (base_node.item_id, KEY_KNOT_NAME["END"]) in result
+
+    def test_divert_at_start_level_zero(self):
+        """Test divert at level 0 without previous nodes"""
+        divert_node = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> target",
+            level=0,
+            line_number=1,
+            name="target",
+        )
+
+        nodes = {divert_node.item_id: divert_node}
+        local_block_name_to_id = {"target": 999}
+
+        result = parse_base_block(nodes, local_block_name_to_id, {})
+
+        # Should connect BEGIN (-2) to target
+        assert (-2, 999) in result
+
+    def test_divert_unknown_target_raises_error(self):
+        """Test that divert to unknown target raises NotImplementedError"""
+        base_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Base",
+            level=0,
+            line_number=1,
+            content="Base",
+        )
+        divert_node = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> unknown",
+            level=0,
+            line_number=2,
+            name="unknown",
+        )
+
+        nodes = {
+            base_node.item_id: base_node,
+            divert_node.item_id: divert_node,
+        }
+
+        with pytest.raises(NotImplementedError):
+            parse_base_block(nodes, {}, {})
+
+
+class TestParseKnot:
+    """Test the parse_knot function"""
+
+    def setup_method(self):
+        """Reset Node ID counter before each test"""
+        Node.reset_id_counter()
+
+    def test_simple_knot_with_header_only(self):
+        """Test knot with only header content"""
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Knot content",
+            level=0,
+            line_number=1,
+            content="Knot content",
+        )
+
+        raw_knot = RawKnot(
+            header={header_node.item_id: header_node}, stitches={}, stitches_info={}
+        )
+
+        nodes, edges = parse_knot(raw_knot, {})
+
+        assert header_node.item_id in nodes
+        assert edges == []  # Single node has no edges
+
+    def test_knot_with_stitches(self):
+        """Test knot with stitches"""
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Knot header",
+            level=0,
+            line_number=1,
+            content="Knot header",
+        )
+
+        stitch_info_node = Node(
+            node_type=NodeType.STITCHES,
+            raw_content="= stitch1",
+            level=0,
+            line_number=2,
+            name="stitch1",
+        )
+
+        stitch_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Stitch content",
+            level=0,
+            line_number=3,
+            content="Stitch content",
+        )
+
+        raw_knot = RawKnot(
+            header={header_node.item_id: header_node},
+            stitches={
+                stitch_info_node.item_id: {
+                    stitch_content_node.item_id: stitch_content_node
+                }
+            },
+            stitches_info={stitch_info_node.item_id: stitch_info_node},
+        )
+
+        nodes, edges = parse_knot(raw_knot, {})
+
+        # Should include all nodes
+        assert header_node.item_id in nodes
+        assert stitch_content_node.item_id in nodes
+
+        # Should have edges between blocks at level 0
+        assert isinstance(edges, list)
+
+    def test_knot_with_choices_and_stitches(self):
+        """Test knot with complex structure including choices"""
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Choose path",
+            level=0,
+            line_number=1,
+            content="Choose path",
+        )
+
+        choice_node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Go to stitch",
+            level=1,
+            line_number=2,
+            content="Go to stitch",
+        )
+
+        stitch_info_node = Node(
+            node_type=NodeType.STITCHES,
+            raw_content="= destination",
+            level=0,
+            line_number=3,
+            name="destination",
+        )
+
+        stitch_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="You arrived",
+            level=0,
+            line_number=4,
+            content="You arrived",
+        )
+
+        raw_knot = RawKnot(
+            header={header_node.item_id: header_node, choice_node.item_id: choice_node},
+            stitches={
+                stitch_info_node.item_id: {
+                    stitch_content_node.item_id: stitch_content_node
+                }
+            },
+            stitches_info={stitch_info_node.item_id: stitch_info_node},
+        )
+
+        nodes, edges = parse_knot(raw_knot, {})
+
+        # Should connect header to choice
+        assert (header_node.item_id, choice_node.item_id) in edges
+
+
+class TestParseStory:
+    """Test the parse_story function"""
+
+    def setup_method(self):
+        """Reset Node ID counter before each test"""
+        Node.reset_id_counter()
+
+    def test_empty_story(self):
+        """Test with empty story"""
+        raw_story = RawStory(header={}, knots={}, knots_info={})
+        nodes, edges = parse_story(raw_story)
+
+        # Should include special nodes
+        assert -1 in nodes  # END
+        assert -2 in nodes  # BEGIN
+        assert -3 in nodes  # AUTO_END
+        assert nodes[-1].node_type == NodeType.END
+        assert nodes[-2].node_type == NodeType.BEGIN
+        assert nodes[-3].node_type == NodeType.AUTO_END
+
+    def test_story_with_header_only(self):
+        """Test story with only header content"""
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Story start",
+            level=0,
+            line_number=1,
+            content="Story start",
+        )
+
+        raw_story = RawStory(
+            header={header_node.item_id: header_node}, knots={}, knots_info={}
+        )
+
+        nodes, edges = parse_story(raw_story)
+
+        # Should include header node and special nodes
+        assert header_node.item_id in nodes
+        assert -1 in nodes
+        assert -2 in nodes
+        assert -3 in nodes
+
+    def test_story_with_knots(self):
+        """Test story with knots"""
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Story intro",
+            level=0,
+            line_number=1,
+            content="Story intro",
+        )
+
+        knot_info_node = Node(
+            node_type=NodeType.KNOT,
+            raw_content="== chapter1 ==",
+            level=0,
+            line_number=2,
+            name="chapter1",
+        )
+
+        knot_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Chapter begins",
+            level=0,
+            line_number=3,
+            content="Chapter begins",
+        )
+
+        raw_knot = RawKnot(
+            header={knot_content_node.item_id: knot_content_node},
+            stitches={},
+            stitches_info={},
+        )
+
+        raw_story = RawStory(
+            header={header_node.item_id: header_node},
+            knots={knot_info_node.item_id: raw_knot},
+            knots_info={knot_info_node.item_id: knot_info_node},
+        )
+
+        nodes, edges = parse_story(raw_story)
+
+        # Should include all content nodes
+        assert header_node.item_id in nodes
+        assert knot_content_node.item_id in nodes
+        assert -1 in nodes
+        assert -2 in nodes
+        assert -3 in nodes
+
+    def test_story_with_complex_structure(self):
+        """Test story with complex knot and stitch structure"""
+        # Create header with choice leading to knot
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Choose your path",
+            level=0,
+            line_number=1,
+            content="Choose your path",
+        )
+
+        choice_node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Enter forest",
+            level=1,
+            line_number=2,
+            content="Enter forest",
+        )
+
+        divert_node = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> forest",
+            level=1,
+            line_number=3,
+            name="forest",
+        )
+
+        # Create forest knot
+        knot_info_node = Node(
+            node_type=NodeType.KNOT,
+            raw_content="== forest ==",
+            level=0,
+            line_number=4,
+            name="forest",
+        )
+
+        forest_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="You are in the forest",
+            level=0,
+            line_number=5,
+            content="You are in the forest",
+        )
+
+        raw_knot = RawKnot(
+            header={forest_content_node.item_id: forest_content_node},
+            stitches={},
+            stitches_info={},
+        )
+
+        raw_story = RawStory(
+            header={
+                header_node.item_id: header_node,
+                choice_node.item_id: choice_node,
+                divert_node.item_id: divert_node,
+            },
+            knots={knot_info_node.item_id: raw_knot},
+            knots_info={knot_info_node.item_id: knot_info_node},
+        )
+
+        nodes, edges = parse_story(raw_story)
+
+        # Should connect choice to forest content via divert
+        assert (choice_node.item_id, forest_content_node.item_id) in edges
 
 
 class TestGraphToMermaid:
@@ -416,8 +721,50 @@ class TestGraphToMermaid:
         assert f'    {node.item_id}["Test content"]' in lines
         assert lines[-1] == "```"
 
-    def test_single_edge(self):
-        """Test with two nodes and single edge"""
+    def test_choice_node_rendering(self):
+        """Test that choice nodes render with curly braces"""
+        choice_node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Choice text",
+            level=1,
+            line_number=1,
+            content="Choice text",
+        )
+        nodes = {choice_node.item_id: choice_node}
+
+        result = graph_to_mermaid(nodes, [])
+
+        # Choice nodes should use curly braces
+        assert f'    {choice_node.item_id}{{"Choice text"}}' in result
+
+    def test_edge_with_choice_text(self):
+        """Test edge rendering with choice text"""
+        base_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Start",
+            level=0,
+            line_number=1,
+            content="Start",
+        )
+        choice_node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Go north",
+            level=1,
+            line_number=2,
+            content="Go north",
+            choice_text="Go north",
+        )
+
+        nodes = {base_node.item_id: base_node, choice_node.item_id: choice_node}
+        edges = [(base_node.item_id, choice_node.item_id)]
+
+        result = graph_to_mermaid(nodes, edges)
+
+        # Should include choice text in edge label
+        assert f"    {base_node.item_id} -->|Go north| {choice_node.item_id}" in result
+
+    def test_regular_edge_without_choice_text(self):
+        """Test regular edge without choice text"""
         node1 = Node(
             node_type=NodeType.BASE,
             raw_content="Node 1",
@@ -437,44 +784,61 @@ class TestGraphToMermaid:
         edges = [(node1.item_id, node2.item_id)]
 
         result = graph_to_mermaid(nodes, edges)
-        lines = result.split("\n")
 
-        assert f'    {node1.item_id}["Node 1"]' in lines
-        assert f'    {node2.item_id}["Node 2"]' in lines
-        assert f"    {node1.item_id} --> {node2.item_id}" in lines
+        # Should be regular arrow without label
+        assert f"    {node1.item_id} --> {node2.item_id}" in result
 
-    def test_multiple_edges(self):
-        """Test with multiple edges"""
-        node1 = Node(
+    def test_content_with_quotes_and_newlines(self):
+        """Test content with quotes and newlines is properly escaped"""
+        node = Node(
             node_type=NodeType.BASE,
-            raw_content="Node 1",
+            raw_content='Content with "quotes"\nand newlines',
             level=0,
             line_number=1,
-            content="Node 1",
+            content='Content with "quotes"\nand newlines',
         )
-        node2 = Node(
+        nodes = {node.item_id: node}
+
+        result = graph_to_mermaid(nodes, [])
+
+        # Quotes should be replaced with single quotes, newlines with spaces
+        assert f"    {node.item_id}[\"Content with 'quotes' and newlines\"]" in result
+
+    def test_long_content_truncation(self):
+        """Test that long content is truncated"""
+        long_content = (
+            "This is a very long piece of content that exceeds fifty characters"
+        )
+        node = Node(
             node_type=NodeType.BASE,
-            raw_content="Node 2",
+            raw_content=long_content,
             level=0,
-            line_number=2,
-            content="Node 2",
+            line_number=1,
+            content=long_content,
         )
-        node3 = Node(
+        nodes = {node.item_id: node}
+
+        result = graph_to_mermaid(nodes, [])
+
+        # Should be truncated to 47 chars + "..."
+        expected_content = long_content[:47] + "..."
+        assert f'    {node.item_id}["{expected_content}"]' in result
+
+    def test_node_with_none_content_skipped(self):
+        """Test that nodes with None content are skipped"""
+        node = Node(
             node_type=NodeType.BASE,
-            raw_content="Node 3",
+            raw_content="Raw content",
             level=0,
-            line_number=3,
-            content="Node 3",
+            line_number=1,
+            content=None,
         )
+        nodes = {node.item_id: node}
 
-        nodes = {node1.item_id: node1, node2.item_id: node2, node3.item_id: node3}
-        edges = [(node1.item_id, node2.item_id), (node2.item_id, node3.item_id)]
+        result = graph_to_mermaid(nodes, [])
 
-        result = graph_to_mermaid(nodes, edges)
-        lines = result.split("\n")
-
-        assert f"    {node1.item_id} --> {node2.item_id}" in lines
-        assert f"    {node2.item_id} --> {node3.item_id}" in lines
+        # Node should not appear in output
+        assert f"{node.item_id}" not in result
 
     def test_duplicate_edges_removed(self):
         """Test that duplicate edges are removed"""
@@ -507,145 +871,30 @@ class TestGraphToMermaid:
         edge_count = sum(1 for line in lines if line == edge_line)
         assert edge_count == 1
 
-    def test_content_with_quotes(self):
-        """Test content containing quotes"""
-        node = Node(
-            node_type=NodeType.BASE,
-            raw_content='Content with "quotes"',
-            level=0,
-            line_number=1,
-            content='Content with "quotes"',
-        )
-        nodes = {node.item_id: node}
+    def test_special_nodes_rendering(self):
+        """Test rendering of special nodes (BEGIN, END, AUTO_END)"""
+        nodes = {-1: Node.end_node(), -2: Node.begin_node(), -3: Node.auto_end_node()}
 
         result = graph_to_mermaid(nodes, [])
 
-        # Quotes should be replaced with single quotes
-        assert f"    {node.item_id}[\"Content with 'quotes'\"]" in result
+        # Special nodes should render with their names
+        assert result == "```mermaid\nflowchart TD\n```"
 
-    def test_content_with_newlines(self):
-        """Test content containing newlines"""
-        node = Node(
-            node_type=NodeType.BASE,
-            raw_content="Line 1\nLine 2",
-            level=0,
-            line_number=1,
-            content="Line 1\nLine 2",
-        )
-        nodes = {node.item_id: node}
 
-        result = graph_to_mermaid(nodes, [])
+class TestKeyKnotName:
+    """Test the KEY_KNOT_NAME constant"""
 
-        # Newlines should be replaced with spaces
-        assert f'    {node.item_id}["Line 1 Line 2"]' in result
+    def test_key_knot_name_values(self):
+        """Test that KEY_KNOT_NAME has correct mappings"""
+        assert KEY_KNOT_NAME["END"] == -1
+        assert KEY_KNOT_NAME["BEGIN"] == -2
+        assert KEY_KNOT_NAME["AUTO_END"] == -3
 
-    def test_long_content_truncation(self):
-        """Test that long content is truncated"""
-        long_content = (
-            "This is a very long piece of content that exceeds fifty characters"
-        )
-        node = Node(
-            node_type=NodeType.BASE,
-            raw_content=long_content,
-            level=0,
-            line_number=1,
-            content=long_content,
-        )
-        nodes = {node.item_id: node}
-
-        result = graph_to_mermaid(nodes, [])
-
-        # Should be truncated to 47 chars + "..."
-        expected_content = long_content[:47] + "..."
-        assert f'    {node.item_id}["{expected_content}"]' in result
-
-    def test_content_exactly_50_chars(self):
-        """Test content that is exactly 50 characters"""
-        content_50 = "x" * 50  # Exactly 50 characters
-        node = Node(
-            node_type=NodeType.BASE,
-            raw_content=content_50,
-            level=0,
-            line_number=1,
-            content=content_50,
-        )
-        nodes = {node.item_id: node}
-
-        result = graph_to_mermaid(nodes, [])
-
-        # Should not be truncated
-        assert f'    {node.item_id}["{content_50}"]' in result
-
-    def test_content_51_chars(self):
-        """Test content that is 51 characters (should be truncated)"""
-        content_51 = "x" * 51  # 51 characters
-        node = Node(
-            node_type=NodeType.BASE,
-            raw_content=content_51,
-            level=0,
-            line_number=1,
-            content=content_51,
-        )
-        nodes = {node.item_id: node}
-
-        result = graph_to_mermaid(nodes, [])
-
-        # Should be truncated
-        expected_content = content_51[:47] + "..."
-        assert f'    {node.item_id}["{expected_content}"]' in result
-
-    def test_node_with_none_content(self):
-        """Test node with None content"""
-        node = Node(
-            node_type=NodeType.BASE,
-            raw_content="Raw content",
-            level=0,
-            line_number=1,
-            content=None,
-        )
-        nodes = {node.item_id: node}
-
-        result = graph_to_mermaid(nodes, [])
-
-        # Should display empty string for None content
-        assert f'    {node.item_id}[""]' in result
-
-    def test_complex_mermaid_structure(self):
-        """Test complex graph structure"""
-        nodes = {}
-        edges = []
-
-        # Create multiple nodes
-        for i in range(1, 4):
-            node = Node(
-                node_type=NodeType.BASE,
-                raw_content=f"Node {i}",
-                level=0,
-                line_number=i,
-                content=f"Node {i}",
-            )
-            nodes[node.item_id] = node
-            if i > 1:
-                prev_id = list(nodes.keys())[i - 2]
-                edges.append((prev_id, node.item_id))
-
-        result = graph_to_mermaid(nodes, edges)
-        lines = result.split("\n")
-
-        # Check structure
-        assert lines[0] == "```mermaid"
-        assert lines[1] == "flowchart TD"
-        assert lines[-1] == "```"
-
-        # Check all nodes are present
-        for node_id in nodes.keys():
-            node_line = f'    {node_id}["Node {list(nodes.keys()).index(node_id) + 1}"]'
-            assert any(node_line in line for line in lines)
-
-        # Check all edges are present
-        for source, target in edges:
-            edge_line = f"    {source} --> {target}"
-            assert edge_line in lines
+    def test_key_knot_name_contains_expected_keys(self):
+        """Test that KEY_KNOT_NAME contains expected keys"""
+        assert "END" in KEY_KNOT_NAME
+        assert "BEGIN" in KEY_KNOT_NAME
+        assert "AUTO_END" in KEY_KNOT_NAME
 
 
 class TestIntegration:
@@ -655,47 +904,33 @@ class TestIntegration:
         """Reset Node ID counter before each test"""
         Node.reset_id_counter()
 
-    def test_full_workflow(self):
-        """Test complete workflow from nodes to mermaid"""
-        # Create a story structure
-        base = Node(
+    def test_full_workflow_simple_story(self):
+        """Test complete workflow from RawStory to mermaid"""
+        # Create simple story with choice
+        header_node = Node(
             node_type=NodeType.BASE,
-            raw_content="Start",
+            raw_content="You wake up",
             level=0,
             line_number=1,
-            content="Start",
+            content="You wake up",
         )
-        choice1 = Node(
+        choice_node = Node(
             node_type=NodeType.CHOICE,
-            raw_content="* Choice 1",
+            raw_content="* Go left",
             level=1,
             line_number=2,
-            content="Choice 1",
-        )
-        choice2 = Node(
-            node_type=NodeType.CHOICE,
-            raw_content="* Choice 2",
-            level=1,
-            line_number=3,
-            content="Choice 2",
-        )
-        gather = Node(
-            node_type=NodeType.GATHER,
-            raw_content="- Gather",
-            level=1,
-            line_number=4,
-            content="Gather",
+            content="Go left",
+            choice_text="Go left",
         )
 
-        nodes = {
-            base.item_id: base,
-            choice1.item_id: choice1,
-            choice2.item_id: choice2,
-            gather.item_id: gather,
-        }
+        raw_story = RawStory(
+            header={header_node.item_id: header_node, choice_node.item_id: choice_node},
+            knots={},
+            knots_info={},
+        )
 
-        # Parse the story to get edges
-        edges = parse_story(nodes)
+        # Parse the story
+        nodes, edges = parse_story(raw_story)
 
         # Generate mermaid diagram
         mermaid = graph_to_mermaid(nodes, edges)
@@ -703,73 +938,371 @@ class TestIntegration:
         # Verify the mermaid contains expected elements
         assert "```mermaid" in mermaid
         assert "flowchart TD" in mermaid
-        assert "Start" in mermaid
-        assert "Choice 1" in mermaid
-        assert "Choice 2" in mermaid
-        assert "Gather" in mermaid
+        assert "You wake up" in mermaid
+        assert "Go left" in mermaid
         assert "-->" in mermaid
 
-    def test_find_leaves_integration_with_parse_story(self):
-        """Test find_leaves_from_node integration with parse_story"""
-        # Create a branching structure
-        choice1 = Node(
+    def test_full_workflow_with_knots_and_diverts(self):
+        """Test workflow with knots and diverts"""
+        # Create header with choice and divert
+        header_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Choose your path",
+            level=0,
+            line_number=1,
+            content="Choose your path",
+        )
+
+        choice_node = Node(
             node_type=NodeType.CHOICE,
-            raw_content="* Choice 1",
+            raw_content="* Enter forest",
+            level=1,
+            line_number=2,
+            content="Enter forest",
+            choice_text="Enter forest",
+        )
+
+        divert_node = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> forest_knot",
+            level=1,
+            line_number=3,
+            name="forest_knot",
+        )
+
+        # Create forest knot
+        knot_info_node = Node(
+            node_type=NodeType.KNOT,
+            raw_content="== forest_knot ==",
+            level=0,
+            line_number=4,
+            name="forest_knot",
+        )
+
+        forest_content_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="You are in the deep forest",
+            level=0,
+            line_number=5,
+            content="You are in the deep forest",
+        )
+
+        raw_knot = RawKnot(
+            header={forest_content_node.item_id: forest_content_node},
+            stitches={},
+            stitches_info={},
+        )
+
+        raw_story = RawStory(
+            header={
+                header_node.item_id: header_node,
+                choice_node.item_id: choice_node,
+                divert_node.item_id: divert_node,
+            },
+            knots={knot_info_node.item_id: raw_knot},
+            knots_info={knot_info_node.item_id: knot_info_node},
+        )
+
+        # Parse the story
+        nodes, edges = parse_story(raw_story)
+
+        # Verify divert connection works
+        assert (choice_node.item_id, forest_content_node.item_id) in edges
+
+        # Generate mermaid
+        mermaid = graph_to_mermaid(nodes, edges)
+
+        # Should contain both header and knot content
+        assert "Choose your path" in mermaid
+        assert "Enter forest" in mermaid
+        assert "You are in the deep forest" in mermaid
+
+    def test_full_workflow_with_gather(self):
+        """Test workflow with gather functionality"""
+        choice1_node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Path A",
             level=1,
             line_number=1,
-            content="Choice 1",
+            content="Path A",
+            choice_text="Path A",
         )
-        choice2 = Node(
+
+        choice2_node = Node(
             node_type=NodeType.CHOICE,
-            raw_content="** Nested 1",
+            raw_content="* Path B",
+            level=1,
+            line_number=2,
+            content="Path B",
+            choice_text="Path B",
+        )
+
+        gather_node = Node(
+            node_type=NodeType.GATHER,
+            raw_content="- You converge here",
+            level=1,
+            line_number=3,
+            content="You converge here",
+        )
+
+        raw_story = RawStory(
+            header={
+                choice1_node.item_id: choice1_node,
+                choice2_node.item_id: choice2_node,
+                gather_node.item_id: gather_node,
+            },
+            knots={},
+            knots_info={},
+        )
+
+        # Parse the story
+        nodes, edges = parse_story(raw_story)
+
+        # Both choices should connect to gather
+        assert (choice1_node.item_id, gather_node.item_id) in edges
+        assert (choice2_node.item_id, gather_node.item_id) in edges
+
+        # Generate mermaid
+        mermaid = graph_to_mermaid(nodes, edges)
+
+        assert "Path A" in mermaid
+        assert "Path B" in mermaid
+        assert "You converge here" in mermaid
+
+    def test_full_workflow_complex_nested_structure(self):
+        """Test workflow with complex nested choices and stitches"""
+        # Create main story
+        intro_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="The adventure begins",
+            level=0,
+            line_number=1,
+            content="The adventure begins",
+        )
+
+        main_choice_node = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Go to village",
+            level=1,
+            line_number=2,
+            content="Go to village",
+            choice_text="Go to village",
+        )
+
+        divert_to_village = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> village",
+            level=1,
+            line_number=3,
+            name="village",
+        )
+
+        # Create village knot with stitches
+        village_knot_info = Node(
+            node_type=NodeType.KNOT,
+            raw_content="== village ==",
+            level=0,
+            line_number=4,
+            name="village",
+        )
+
+        village_intro = Node(
+            node_type=NodeType.BASE,
+            raw_content="You enter the village",
+            level=0,
+            line_number=5,
+            content="You enter the village",
+        )
+
+        village_choice = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Visit tavern",
+            level=1,
+            line_number=6,
+            content="Visit tavern",
+            choice_text="Visit tavern",
+        )
+
+        divert_to_tavern = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> tavern",
+            level=1,
+            line_number=7,
+            name="tavern",
+        )
+
+        # Create tavern stitch
+        tavern_stitch_info = Node(
+            node_type=NodeType.STITCHES,
+            raw_content="= tavern",
+            level=0,
+            line_number=8,
+            name="tavern",
+        )
+
+        tavern_content = Node(
+            node_type=NodeType.BASE,
+            raw_content="The tavern is warm and welcoming",
+            level=0,
+            line_number=9,
+            content="The tavern is warm and welcoming",
+        )
+
+        # Build the structures
+        village_knot = RawKnot(
+            header={
+                village_intro.item_id: village_intro,
+                village_choice.item_id: village_choice,
+                divert_to_tavern.item_id: divert_to_tavern,
+            },
+            stitches={
+                tavern_stitch_info.item_id: {tavern_content.item_id: tavern_content}
+            },
+            stitches_info={tavern_stitch_info.item_id: tavern_stitch_info},
+        )
+
+        raw_story = RawStory(
+            header={
+                intro_node.item_id: intro_node,
+                main_choice_node.item_id: main_choice_node,
+                divert_to_village.item_id: divert_to_village,
+            },
+            knots={village_knot_info.item_id: village_knot},
+            knots_info={village_knot_info.item_id: village_knot_info},
+        )
+
+        # Parse the story
+        nodes, edges = parse_story(raw_story)
+
+        # Verify complex connections
+        assert (intro_node.item_id, main_choice_node.item_id) in edges
+        assert (main_choice_node.item_id, village_intro.item_id) in edges  # Via divert
+        assert (village_intro.item_id, village_choice.item_id) in edges
+        assert (
+            village_choice.item_id,
+            tavern_content.item_id,
+        ) in edges  # Via divert to stitch
+
+        # Generate mermaid
+        mermaid = graph_to_mermaid(nodes, edges)
+
+        # Should contain all content
+        assert "The adventure begins" in mermaid
+        assert "Go to village" in mermaid
+        assert "You enter the village" in mermaid
+        assert "Visit tavern" in mermaid
+        assert "The tavern is warm and welcoming" in mermaid
+
+    def test_find_leaves_integration_with_parse_base_block(self):
+        """Test find_leaves_from_node integration with parse_base_block"""
+        # Create a branching structure that tests leaf finding
+        choice1 = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="* Branch A",
+            level=1,
+            line_number=1,
+            content="Branch A",
+        )
+
+        nested_choice1 = Node(
+            node_type=NodeType.CHOICE,
+            raw_content="** Nested A1",
             level=2,
             line_number=2,
-            content="Nested 1",
+            content="Nested A1",
         )
-        choice3 = Node(
+
+        nested_choice2 = Node(
             node_type=NodeType.CHOICE,
-            raw_content="** Nested 2",
+            raw_content="** Nested A2",
             level=2,
             line_number=3,
-            content="Nested 2",
+            content="Nested A2",
         )
-        choice4 = Node(
+
+        choice2 = Node(
             node_type=NodeType.CHOICE,
-            raw_content="* Choice 2",
+            raw_content="* Branch B",
             level=1,
             line_number=4,
-            content="Choice 2",
+            content="Branch B",
         )
+
         gather = Node(
             node_type=NodeType.GATHER,
-            raw_content="- Gather",
+            raw_content="- Convergence point",
             level=1,
             line_number=5,
-            content="Gather",
+            content="Convergence point",
         )
 
         nodes = {
             choice1.item_id: choice1,
+            nested_choice1.item_id: nested_choice1,
+            nested_choice2.item_id: nested_choice2,
             choice2.item_id: choice2,
-            choice3.item_id: choice3,
-            choice4.item_id: choice4,
             gather.item_id: gather,
         }
 
-        # Parse story
-        edges = parse_story(nodes)
+        # Parse using parse_base_block
+        edges = parse_base_block(nodes, {}, {})
 
         # Test find_leaves_from_node with the generated edges
         leaves_from_choice1 = find_leaves_from_node(choice1.item_id, edges)
 
-        # Should find the nested choices as leaves
-        assert gather.item_id in leaves_from_choice1
+        # Should find the nested choices as leaves from choice1
+        assert leaves_from_choice1 == [5]
+
+        # Gather should connect to all leaves at its level
+        gather_edges = [
+            (choice2.item_id, gather.item_id),
+            (nested_choice1.item_id, gather.item_id),
+            (nested_choice2.item_id, gather.item_id),
+        ]
+        actual_gather_edges = [
+            (source, target) for source, target in edges if target == gather.item_id
+        ]
+        assert len(actual_gather_edges) == len(gather_edges)
+        for edge in gather_edges:
+            assert edge in actual_gather_edges
+
+    def test_error_handling_integration(self):
+        """Test error handling in integrated workflow"""
+        # Create story with invalid divert
+        base_node = Node(
+            node_type=NodeType.BASE,
+            raw_content="Start",
+            level=0,
+            line_number=1,
+            content="Start",
+        )
+
+        invalid_divert = Node(
+            node_type=NodeType.DIVERT,
+            raw_content="-> nonexistent_target",
+            level=0,
+            line_number=2,
+            name="nonexistent_target",
+        )
+
+        raw_story = RawStory(
+            header={
+                base_node.item_id: base_node,
+                invalid_divert.item_id: invalid_divert,
+            },
+            knots={},
+            knots_info={},
+        )
+
+        # Should raise NotImplementedError during parsing
+        with pytest.raises(NotImplementedError):
+            parse_story(raw_story)
 
 
 # Fixtures for common test data
 @pytest.fixture
-def sample_story_nodes():
-    """Sample story nodes for testing"""
+def simple_raw_story():
+    """Simple RawStory for testing"""
     Node.reset_id_counter()
 
     base = Node(
@@ -785,6 +1318,7 @@ def sample_story_nodes():
         level=1,
         line_number=2,
         content="Go left",
+        choice_text="Go left",
     )
     choice2 = Node(
         node_type=NodeType.CHOICE,
@@ -792,6 +1326,7 @@ def sample_story_nodes():
         level=1,
         line_number=3,
         content="Go right",
+        choice_text="Go right",
     )
     gather = Node(
         node_type=NodeType.GATHER,
@@ -801,75 +1336,145 @@ def sample_story_nodes():
         content="You continue",
     )
 
-    return {
-        base.item_id: base,
-        choice1.item_id: choice1,
-        choice2.item_id: choice2,
-        gather.item_id: gather,
-    }
+    return RawStory(
+        header={
+            base.item_id: base,
+            choice1.item_id: choice1,
+            choice2.item_id: choice2,
+            gather.item_id: gather,
+        },
+        knots={},
+        knots_info={},
+    )
 
 
 @pytest.fixture
-def complex_story_nodes():
-    """Complex story structure for testing"""
+def complex_raw_story_with_knots():
+    """Complex RawStory with knots and stitches for testing"""
     Node.reset_id_counter()
 
-    nodes = {}
-
-    # Level 0 - Base content
-    base = Node(
+    # Header
+    intro = Node(
         node_type=NodeType.BASE,
-        raw_content="Story start",
+        raw_content="Story introduction",
         level=0,
         line_number=1,
-        content="Story start",
+        content="Story introduction",
     )
-    nodes[base.item_id] = base
 
-    # Level 1 - Main choices
-    choice1 = Node(
+    main_choice = Node(
         node_type=NodeType.CHOICE,
-        raw_content="* Path A",
+        raw_content="* Begin adventure",
         level=1,
         line_number=2,
-        content="Path A",
+        content="Begin adventure",
+        choice_text="Begin adventure",
     )
-    choice2 = Node(
-        node_type=NodeType.CHOICE,
-        raw_content="* Path B",
+
+    divert_to_chapter = Node(
+        node_type=NodeType.DIVERT,
+        raw_content="-> chapter1",
         level=1,
         line_number=3,
-        content="Path B",
+        name="chapter1",
     )
-    nodes[choice1.item_id] = choice1
-    nodes[choice2.item_id] = choice2
 
-    # Level 2 - Nested choices
-    nested1 = Node(
-        node_type=NodeType.CHOICE,
-        raw_content="** Nested A1",
-        level=2,
+    # Chapter 1 knot
+    chapter1_info = Node(
+        node_type=NodeType.KNOT,
+        raw_content="== chapter1 ==",
+        level=0,
         line_number=4,
-        content="Nested A1",
+        name="chapter1",
     )
-    nested2 = Node(
-        node_type=NodeType.CHOICE,
-        raw_content="** Nested A2",
-        level=2,
-        line_number=5,
-        content="Nested A2",
-    )
-    nodes[nested1.item_id] = nested1
-    nodes[nested2.item_id] = nested2
 
-    # Level 1 - Gather
-    gather = Node(
-        node_type=NodeType.GATHER,
-        raw_content="- Convergence",
+    chapter1_content = Node(
+        node_type=NodeType.BASE,
+        raw_content="Chapter 1 begins",
+        level=0,
+        line_number=5,
+        content="Chapter 1 begins",
+    )
+
+    chapter1_choice = Node(
+        node_type=NodeType.CHOICE,
+        raw_content="* Explore forest",
         level=1,
         line_number=6,
-        content="Convergence",
+        content="Explore forest",
+        choice_text="Explore forest",
     )
-    nodes[gather.item_id] = gather
 
-    return nodes
+    divert_to_forest = Node(
+        node_type=NodeType.DIVERT,
+        raw_content="-> forest_section",
+        level=1,
+        line_number=7,
+        name="forest_section",
+    )
+
+    # Forest stitch
+    forest_stitch_info = Node(
+        node_type=NodeType.STITCHES,
+        raw_content="= forest_section",
+        level=0,
+        line_number=8,
+        name="forest_section",
+    )
+
+    forest_content = Node(
+        node_type=NodeType.BASE,
+        raw_content="You explore the mysterious forest",
+        level=0,
+        line_number=9,
+        content="You explore the mysterious forest",
+    )
+
+    # Build knot structure
+    chapter1_knot = RawKnot(
+        header={
+            chapter1_content.item_id: chapter1_content,
+            chapter1_choice.item_id: chapter1_choice,
+            divert_to_forest.item_id: divert_to_forest,
+        },
+        stitches={forest_stitch_info.item_id: {forest_content.item_id: forest_content}},
+        stitches_info={forest_stitch_info.item_id: forest_stitch_info},
+    )
+
+    return RawStory(
+        header={
+            intro.item_id: intro,
+            main_choice.item_id: main_choice,
+            divert_to_chapter.item_id: divert_to_chapter,
+        },
+        knots={chapter1_info.item_id: chapter1_knot},
+        knots_info={chapter1_info.item_id: chapter1_info},
+    )
+
+
+@pytest.fixture
+def story_with_special_nodes():
+    """RawStory that will include special nodes after parsing"""
+    Node.reset_id_counter()
+
+    simple_node = Node(
+        node_type=NodeType.BASE,
+        raw_content="Simple story",
+        level=0,
+        line_number=1,
+        content="Simple story",
+    )
+
+    end_divert = Node(
+        node_type=NodeType.DIVERT,
+        raw_content="-> END",
+        level=0,
+        line_number=2,
+        name="END",
+    )
+
+    return RawStory(
+        header={simple_node.item_id: simple_node, end_divert.item_id: end_divert},
+        knots={},
+        knots_info={},
+    )
