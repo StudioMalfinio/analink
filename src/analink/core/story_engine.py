@@ -30,6 +30,7 @@ class StoryEngine:
             story_text: The ink story content as a string
             typing_speed: Delay between characters for typing effect (0 = instant)
         """
+        Node.reset_id_counter()
         self.typing_speed = typing_speed
 
         # Parse the story

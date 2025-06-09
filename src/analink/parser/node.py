@@ -155,67 +155,87 @@ def extract_knot_name(text):
     return text.strip()
 
 
-def parse_node(line: str, line_number: int) -> Optional[Node]:
+def parse_node(
+    line: str, line_number: int, last_level: int
+) -> tuple[Optional[Node], int]:
     """Parse a single line of Ink code"""
     stripped = line.strip()
     # Skip empty lines and comments
     if not stripped or stripped.startswith("//"):
-        return None
+        return None, last_level
     # Skip special directives like -> END
     if stripped.startswith("->"):
-        return Node(
-            level=0,
-            node_type=NodeType.DIVERT,
-            raw_content=line,
-            line_number=line_number,
-            name=stripped.split("->")[-1].strip(),
+        return (
+            Node(
+                level=last_level,
+                node_type=NodeType.DIVERT,
+                raw_content=line,
+                line_number=line_number,
+                name=stripped.split("->")[-1].strip(),
+            ),
+            last_level,
         )
     # Check for choices (stars) and gathers (dashes) in the stripped line
     if stripped.startswith("=="):
         knot_name = extract_knot_name(stripped)
-        return Node(
-            node_type=NodeType.KNOT,
-            raw_content=stripped,
-            level=0,
-            line_number=line_number,
-            name=knot_name,
+        return (
+            Node(
+                node_type=NodeType.KNOT,
+                raw_content=stripped,
+                level=0,
+                line_number=line_number,
+                name=knot_name,
+            ),
+            0,
         )
 
         # this is a knot
     if stripped.startswith("="):
         stitches_name = extract_knot_name(stripped)
-        return Node(
-            node_type=NodeType.STITCHES,
-            raw_content=stripped,
-            level=0,
-            line_number=line_number,
-            name=stitches_name,
+        return (
+            Node(
+                node_type=NodeType.STITCHES,
+                raw_content=stripped,
+                level=0,
+                line_number=line_number,
+                name=stitches_name,
+            ),
+            0,
         )
         # this is a stitches since this is not a node
     choice_count, text_choice = count_leading_chars(stripped, "*")
     gather_count, text_gather = count_leading_chars(stripped, "-")
     if choice_count > 0:
-        return Node(
-            level=choice_count,
-            node_type=NodeType.CHOICE,
-            content=text_choice,
-            raw_content=line,
-            line_number=line_number,
+        return (
+            Node(
+                level=choice_count,
+                node_type=NodeType.CHOICE,
+                content=text_choice,
+                raw_content=line,
+                line_number=line_number,
+            ),
+            choice_count,
         )
     if gather_count > 0:
-        return Node(
-            level=gather_count,
-            node_type=NodeType.GATHER,
-            content=text_gather,
+        return (
+            Node(
+                level=gather_count,
+                node_type=NodeType.GATHER,
+                content=text_gather,
+                raw_content=line,
+                line_number=line_number,
+            ),
+            gather_count,
+        )
+    return (
+        Node(
+            level=last_level,
+            node_type=NodeType.BASE,
+            content=stripped,
             raw_content=line,
             line_number=line_number,
-        )
-    return Node(
-        level=0,
-        node_type=NodeType.BASE,
-        content=stripped,
-        raw_content=line,
-        line_number=line_number,
+        ),
+        last_level,
     )
 
 
@@ -289,9 +309,10 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> RawStory:
     raw_lines = ink_code.strip().split("\n")
     previous_item_id = None
     i = 0
+    last_level = 0
     while i < len(raw_lines):
         line = raw_lines[i]
-        parsed_line = parse_node(line, i + 1)
+        parsed_line, last_level = parse_node(line, i + 1, last_level)
         if parsed_line is None:
             i += 1
             continue

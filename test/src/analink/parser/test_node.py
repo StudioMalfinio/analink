@@ -374,57 +374,60 @@ class TestParseNode:
 
     def test_parse_empty_line(self):
         """Test parsing empty line returns None"""
-        result = parse_node("", 1)
-        assert result is None
+        result = parse_node("", 1, 0)
+        assert result == (None, 0)
 
     def test_parse_whitespace_only_line(self):
         """Test parsing whitespace-only line returns None"""
-        result = parse_node("   \t  ", 1)
-        assert result is None
+        result = parse_node("   \t  ", 1, 0)
+        assert result == (None, 0)
 
     def test_parse_comment_line(self):
         """Test parsing comment line returns None"""
-        result = parse_node("// This is a comment", 1)
-        assert result is None
+        result = parse_node("// This is a comment", 1, 0)
+        assert result == (None, 0)
 
     def test_parse_comment_line_with_leading_whitespace(self):
         """Test parsing comment line with leading whitespace returns None"""
-        result = parse_node("  // This is a comment", 1)
-        assert result is None
+        result = parse_node("  // This is a comment", 1, 0)
+        assert result == (None, 0)
 
     def test_parse_directive_line(self):
         """Test parsing directive line returns DIVERT node"""
-        result = parse_node("-> END", 1)
+        result, _ = parse_node("-> END", 1, 0)
         assert result is not None
         assert result.node_type == NodeType.DIVERT
         assert result.name == "END"
 
     def test_parse_directive_line_with_whitespace(self):
         """Test parsing directive line with whitespace"""
-        result = parse_node("  -> DONE  ", 1)
+        result, actual_level = parse_node("  -> DONE  ", 1, 4)
         assert result is not None
         assert result.node_type == NodeType.DIVERT
         assert result.name == "DONE"
+        assert actual_level == 4
 
     def test_parse_knot_double_equals(self):
         """Test parsing knot with double equals"""
-        result = parse_node("== forest_path ==", 1)
+        result, actual_level = parse_node("== forest_path ==", 1, 5)
         assert result is not None
         assert result.node_type == NodeType.KNOT
         assert result.name == "forest_path"
         assert result.level == 0
+        assert actual_level == 0
 
     def test_parse_stitches_single_equals(self):
         """Test parsing stitches with single equals"""
-        result = parse_node("= village_entrance", 1)
+        result, actual_level = parse_node("= village_entrance", 1, 5)
         assert result is not None
         assert result.node_type == NodeType.STITCHES
         assert result.name == "village_entrance"
         assert result.level == 0
+        assert actual_level == 0
 
     def test_parse_choice_single_star(self):
         """Test parsing single star choice"""
-        result = parse_node("* This is a choice", 5)
+        result, actual_level = parse_node("* This is a choice", 5, 5)
 
         assert result is not None
         assert result.node_type == NodeType.CHOICE
@@ -432,10 +435,11 @@ class TestParseNode:
         assert result.content == "This is a choice"
         assert result.raw_content == "* This is a choice"
         assert result.line_number == 5
+        assert actual_level == 1
 
     def test_parse_choice_multiple_stars(self):
         """Test parsing multiple star choice"""
-        result = parse_node("*** Deep choice", 10)
+        result, actual_level = parse_node("*** Deep choice", 10, 10)
 
         assert result is not None
         assert result.node_type == NodeType.CHOICE
@@ -443,10 +447,11 @@ class TestParseNode:
         assert result.content == "Deep choice"
         assert result.raw_content == "*** Deep choice"
         assert result.line_number == 10
+        assert actual_level == 3
 
     def test_parse_choice_with_whitespace(self):
         """Test parsing choice with leading/trailing whitespace"""
-        result = parse_node("  ** Choice with spaces  ", 2)
+        result, actual_level = parse_node("  ** Choice with spaces  ", 2, 5)
 
         assert result is not None
         assert result.node_type == NodeType.CHOICE
@@ -454,10 +459,11 @@ class TestParseNode:
         assert result.content == "Choice with spaces"
         assert result.raw_content == "  ** Choice with spaces  "
         assert result.line_number == 2
+        assert actual_level == 2
 
     def test_parse_gather_single_dash(self):
         """Test parsing single dash gather"""
-        result = parse_node("- This is a gather", 3)
+        result, _ = parse_node("- This is a gather", 3, 0)
 
         assert result is not None
         assert result.node_type == NodeType.GATHER
@@ -468,7 +474,7 @@ class TestParseNode:
 
     def test_parse_gather_multiple_dashes(self):
         """Test parsing multiple dash gather"""
-        result = parse_node("--- Deep gather", 7)
+        result, actual_level = parse_node("--- Deep gather", 7, 10)
 
         assert result is not None
         assert result.node_type == NodeType.GATHER
@@ -476,21 +482,23 @@ class TestParseNode:
         assert result.content == "Deep gather"
         assert result.raw_content == "--- Deep gather"
         assert result.line_number == 7
+        assert actual_level == 3
 
     def test_parse_base_content(self):
         """Test parsing base content"""
-        result = parse_node("This is base content", 1)
+        result, actual_level = parse_node("This is base content", 1, 10)
 
         assert result is not None
         assert result.node_type == NodeType.BASE
-        assert result.level == 0
+        assert result.level == 10
         assert result.content == "This is base content"
         assert result.raw_content == "This is base content"
         assert result.line_number == 1
+        assert actual_level == 10
 
     def test_parse_base_content_with_whitespace(self):
         """Test parsing base content with whitespace"""
-        result = parse_node("  Base content with spaces  ", 4)
+        result, _ = parse_node("  Base content with spaces  ", 4, 0)
 
         assert result is not None
         assert result.node_type == NodeType.BASE
@@ -501,7 +509,7 @@ class TestParseNode:
 
     def test_parse_choice_empty_content(self):
         """Test parsing choice with empty content"""
-        result = parse_node("*", 1)
+        result, _ = parse_node("*", 1, 1)
 
         assert result is not None
         assert result.node_type == NodeType.CHOICE
@@ -512,7 +520,7 @@ class TestParseNode:
 
     def test_parse_gather_empty_content(self):
         """Test parsing gather with empty content"""
-        result = parse_node("-", 1)
+        result, _ = parse_node("-", 1, 0)
 
         assert result is not None
         assert result.node_type == NodeType.GATHER

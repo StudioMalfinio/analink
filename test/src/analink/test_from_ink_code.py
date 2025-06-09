@@ -295,3 +295,38 @@ def test_parser_story_full(ink_code, expected_nodes, expected_mermaid):
     actual_mermaid = graph_to_mermaid(actual_nodes, actual_edges)
 
     assert actual_mermaid == expected_mermaid
+
+
+def test_for_debug():
+    from analink.parser.graph_story import parse_story
+    from analink.parser.node import Node, clean_lines
+
+    Node.reset_id_counter()
+    ink_code_1 = """=== back_in_london ===
+
+We arrived into London at 9.45pm exactly.
+
+*	"There is not a moment to lose!"[] I declared.
+	-> hurry_outside
+
+*	"Monsieur, let us savour this moment!"[] I declared.
+	My master clouted me firmly around the head and dragged me out of the door.
+	-> dragged_outside
+
+*	[We hurried home] -> hurry_outside
+
+
+=== hurry_outside ===
+We hurried home to Savile Row -> as_fast_as_we_could
+
+
+=== dragged_outside ===
+He insisted that we hurried home to Savile Row
+-> as_fast_as_we_could
+
+
+=== as_fast_as_we_could ===
+<> as fast as we could."""
+    raw_story = clean_lines(ink_code_1)
+    nodes, edges = parse_story(raw_story)
+    assert True

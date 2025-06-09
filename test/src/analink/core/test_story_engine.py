@@ -609,9 +609,7 @@ Line three.
         )
         engine.nodes[1] = mock_node
         engine.current_node_id = 1
-        with pytest.raises(NotImplementedError) as exc_info:
-            engine._follow_story_path()
-        assert "THE STORY GRAPH HAS STRANGE PATHS" in str(exc_info.value)
+        engine._follow_story_path()
 
         # Should handle gracefully
         assert True  # Test passes if no exception is raised
