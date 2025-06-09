@@ -190,8 +190,8 @@ def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> st
         if node.content is None:
             continue
         content = node.content.replace('"', "'").replace("\n", " ")
-        if len(content) > 50:
-            content = content[:47] + "..."
+        # if len(content) > 50:
+        #     content = content[:47] + "..."
         if node.node_type is NodeType.CHOICE:
             lines.append(f'    {node_id}{{"{content}"}}')
         else:

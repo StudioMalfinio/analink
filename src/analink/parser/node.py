@@ -156,12 +156,20 @@ def extract_knot_name(text):
 
 
 def parse_node(
-    line: str, line_number: int, last_level: int
+    line: str, line_number: int, last_level: int, in_comment: bool = False
 ) -> tuple[Optional[Node], int]:
     """Parse a single line of Ink code"""
     stripped = line.strip()
     # Skip empty lines and comments
     if not stripped or stripped.startswith("//"):
+        return None, last_level
+    if stripped.startswith("/*"):
+        in_comment = True
+        return None, last_level
+    if stripped.startswith("*/"):
+        in_comment = False
+        return None, last_level
+    if in_comment:
         return None, last_level
     # Skip special directives like -> END
     if stripped.startswith("->"):

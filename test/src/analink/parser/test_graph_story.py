@@ -819,7 +819,9 @@ class TestGraphToMermaid:
         result = graph_to_mermaid(nodes, [])
 
         # Should be truncated to 47 chars + "..."
-        expected_content = long_content[:47] + "..."
+        expected_content = (
+            "This is a very long piece of content that exceeds fifty characters"
+        )
         assert f'    {node.item_id}["{expected_content}"]' in result
 
     def test_node_with_none_content_skipped(self):

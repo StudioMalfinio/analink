@@ -108,7 +108,7 @@ Line three.
 
         if engine.nodes:
             start_node = engine._find_start_node()
-            assert start_node == list(engine.nodes.keys())[0]
+            assert start_node == -2
         else:
             start_node = engine._find_start_node()
             assert start_node == 1
@@ -586,7 +586,7 @@ Line three.
         engine.edges = []
 
         start_node = engine._find_start_node()
-        assert start_node == 1
+        assert start_node == -2
 
         choices = engine.get_available_choices()
         assert choices == []

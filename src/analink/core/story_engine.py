@@ -6,7 +6,7 @@ from typing import Callable, List, Optional
 
 import networkx as nx
 
-from analink.parser.graph_story import parse_story
+from analink.parser.graph_story import graph_to_mermaid, parse_story
 from analink.parser.node import Node, NodeType, clean_lines
 
 
@@ -49,6 +49,9 @@ class StoryEngine:
         self.on_choices_updated: Optional[Callable[[List[Node]], None]] = None
         self.on_story_complete: Optional[Callable[[], None]] = None
 
+    def to_mermaid(self):
+        return graph_to_mermaid(self.nodes, self.edges)
+
     @classmethod
     def from_file(cls, filepath: str, **kwargs) -> "StoryEngine":
         """Create a story engine from an ink file."""
@@ -68,7 +71,12 @@ class StoryEngine:
     def _find_start_node(self) -> int:
         """Find the starting node of the story."""
         if not self.edges:
-            return list(self.nodes.keys())[0] if self.nodes else 1
+            if self.nodes:
+                candidate_start = list(self.nodes.keys())[0]
+            else:
+                candidate_start = 1
+            self.edges.append((-2, candidate_start))
+            return -2
 
         nodes_with_incoming = {target for source, target in self.edges}
         if -1 not in nodes_with_incoming:
