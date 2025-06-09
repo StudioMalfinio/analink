@@ -65,6 +65,11 @@ class StoryEngine:
         all_nodes = all_nodes - set([-1, -2, -3])
         source_nodes = set([source for source, _ in self.edges])
         remaining_nodes = all_nodes - source_nodes
+        all_nodes_in_edges = set(
+            [target for _, target in self.edges] + [source for source, _ in self.edges]
+        )
+        orphan_nodes = all_nodes - all_nodes_in_edges
+        remaining_nodes = remaining_nodes - orphan_nodes
         for node_id in remaining_nodes:
             self.edges.append((node_id, -3))
 
