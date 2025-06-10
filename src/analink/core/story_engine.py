@@ -7,8 +7,8 @@ from typing import Callable, List, Optional
 
 import networkx as nx
 
+from analink.core.parser import Node, NodeType, clean_lines
 from analink.parser.graph_story import graph_to_mermaid, parse_story
-from analink.parser.node import Node, NodeType, clean_lines
 
 
 class StoryEngine:

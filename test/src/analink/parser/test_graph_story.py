@@ -1,5 +1,6 @@
 import pytest
 
+from analink.core.parser import Node, NodeType, RawKnot, RawStory
 from analink.parser.graph_story import (
     KEY_KNOT_NAME,
     escape_mermaid_text,
@@ -10,7 +11,6 @@ from analink.parser.graph_story import (
     parse_knot,
     parse_story,
 )
-from analink.parser.node import Node, NodeType, RawKnot, RawStory
 
 
 class TestFindLeavesFromNode:

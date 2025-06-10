@@ -6,8 +6,8 @@ from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
+from analink.core.parser import Node, NodeType
 from analink.core.story_engine import StoryEngine
-from analink.parser.node import Node, NodeType
 
 
 class TestStoryEngine:

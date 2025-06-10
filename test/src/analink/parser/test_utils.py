@@ -1,6 +1,6 @@
 import pytest
 
-from analink.parser.utils import extract_parts
+from analink.parser.utils import count_leading_chars, extract_knot_name, extract_parts
 
 
 class TestExtractParts:
@@ -61,3 +61,95 @@ class TestExtractParts:
         version1, version2 = extract_parts(text)
         assert version1 == "Line one\nSelect"
         assert version2 == "Line one\n this option\nLine three"
+
+
+class TestExtractKnotName:
+    """Test the extract_knot_name function"""
+
+    def test_extract_double_equals(self):
+        """Test extracting knot name with double equals"""
+        assert extract_knot_name("== forest_path ==") == "forest_path"
+
+    def test_extract_multiple_equals(self):
+        """Test extracting with multiple equals"""
+        assert extract_knot_name("=== village ===") == "village"
+
+    def test_extract_uneven_equals(self):
+        """Test extracting with uneven equals"""
+        assert extract_knot_name("== castle_gate =") == "castle_gate"
+
+    def test_extract_only_leading_equals(self):
+        """Test extracting with only leading equals"""
+        assert extract_knot_name("== dungeon") == "dungeon"
+
+    def test_extract_with_spaces(self):
+        """Test extracting with spaces around name"""
+        assert extract_knot_name("==   mountain_peak   ==") == "mountain_peak"
+
+    def test_extract_simple_text(self):
+        """Test with text that doesn't match pattern"""
+        assert extract_knot_name("simple text") == "simple text"
+
+
+class TestCountLeadingChars:
+    """Test the count_leading_chars function"""
+
+    def test_no_leading_chars(self):
+        """Test line with no leading characters"""
+        count, text = count_leading_chars("hello world", "*")
+        assert count == 0
+        assert text == "hello world"
+
+    def test_single_leading_char(self):
+        """Test line with single leading character"""
+        count, text = count_leading_chars("*hello world", "*")
+        assert count == 1
+        assert text == "hello world"
+
+    def test_multiple_leading_chars(self):
+        """Test line with multiple leading characters"""
+        count, text = count_leading_chars("***hello world", "*")
+        assert count == 3
+        assert text == "hello world"
+
+    def test_leading_chars_with_spaces(self):
+        """Test line with leading characters followed by spaces"""
+        count, text = count_leading_chars("*  hello world", "*")
+        assert count == 1
+        assert text == "hello world"
+
+    def test_leading_chars_with_tabs(self):
+        """Test line with leading characters followed by tabs"""
+        count, text = count_leading_chars("*\t\thello world", "*")
+        assert count == 1
+        assert text == "hello world"
+
+    def test_leading_chars_with_mixed_whitespace(self):
+        """Test line with leading characters followed by mixed whitespace"""
+        count, text = count_leading_chars("** \t hello world", "*")
+        assert count == 2
+        assert text == "hello world"
+
+    def test_only_leading_chars(self):
+        """Test line with only leading characters"""
+        count, text = count_leading_chars("***", "*")
+        assert count == 3
+        assert text == ""
+
+    def test_different_char(self):
+        """Test with different leading character"""
+        count, text = count_leading_chars("---hello", "-")
+        assert count == 3
+        assert text == "hello"
+
+    def test_empty_string(self):
+        """Test with empty string"""
+        count, text = count_leading_chars("", "*")
+        assert count == 0
+        assert text == ""
+
+    def test_only_whitespace(self):
+        """Test with only whitespace"""
+        count, text = count_leading_chars("   ", "*")
+        assert count == 0
+        assert text == ""

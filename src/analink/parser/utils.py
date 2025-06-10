@@ -17,6 +17,15 @@ def count_leading_chars(line: str, char: str) -> tuple[int, str]:
     return count, line[idx:]
 
 
+def extract_knot_name(text):
+    """Extract knot name between = markers"""
+    # Match leading =, capture the middle part, ignore trailing =
+    match = re.match(r"^=+\s*(.+?)\s*=*$", text.strip())
+    if match:
+        return match.group(1).strip()
+    return text.strip()
+
+
 def extract_parts(text):
     # Use re.DOTALL flag to make . match newlines too
     pattern = r"(.*)(?<!\\)\[([^\]]*)\](.*)"

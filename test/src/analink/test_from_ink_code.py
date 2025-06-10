@@ -1,7 +1,7 @@
 import pytest
 
+from analink.core.parser import Node, NodeType, clean_lines
 from analink.parser.graph_story import graph_to_mermaid, parse_story
-from analink.parser.node import Node, NodeType, clean_lines
 
 
 @pytest.mark.parametrize(
@@ -298,8 +298,8 @@ def test_parser_story_full(ink_code, expected_nodes, expected_mermaid):
 
 
 def test_for_debug():
+    from analink.core.parser import Node, clean_lines
     from analink.parser.graph_story import parse_story
-    from analink.parser.node import Node, clean_lines
 
     Node.reset_id_counter()
     ink_code_1 = """=== back_in_london ===

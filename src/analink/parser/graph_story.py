@@ -2,7 +2,7 @@ from typing import Optional
 
 import networkx as nx
 
-from analink.parser.node import Node, NodeType, RawKnot, RawStory
+from analink.core.parser import Node, NodeType, RawKnot, RawStory
 
 KEY_KNOT_NAME = {"END": -1, "BEGIN": -2, "AUTO_END": -3}
 

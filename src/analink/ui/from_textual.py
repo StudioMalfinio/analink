@@ -9,8 +9,8 @@ from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Button, Static
 
+from analink.core.parser import Node
 from analink.core.story_engine import StoryEngine
-from analink.parser.node import Node
 from analink.ui.styles import (  # , CYBERPUNK_CSS, VINTAGE_TERMINAL_CSS, FANTASY_SCROLL_CSS
     APP_CSS,
 )
