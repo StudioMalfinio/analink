@@ -1,5 +1,6 @@
 import re
 from enum import Enum
+from pathlib import Path
 from typing import ClassVar, Optional
 
 from pydantic import BaseModel, PrivateAttr, computed_field
@@ -321,7 +322,9 @@ class RawStory(BaseModel):
         return None
 
 
-def clean_lines(ink_code: str, clean_text_sep=" ") -> RawStory:
+def clean_lines(
+    ink_code: str, clean_text_sep=" ", cwd: Optional[Path] = None
+) -> RawStory:
     lines: dict[int, Node] = {}
     raw_lines = ink_code.strip().split("\n")
     previous_item_id = None
@@ -329,6 +332,14 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> RawStory:
     last_level = 0
     while i < len(raw_lines):
         line = raw_lines[i]
+        if line.strip().startswith("INCLUDE"):
+            file_name = line.split("INCLUDE")[-1].strip()
+
+            with open((cwd if cwd else Path.cwd()) / file_name, "r") as f:
+                new_data = f.read()
+            raw_lines.extend(new_data.strip().split("\n"))
+            i += 1
+            continue
         parsed_line, last_level = parse_node(line, i + 1, last_level)
         if parsed_line is None:
             i += 1
@@ -365,23 +376,27 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> RawStory:
             previous_item_id = parsed_line.item_id
         i += 1
     header = {}
-    knots = {}
+    knots: dict[int, RawKnot] = {}
     last_knot = None
     knot_info = {}
     last_stitches = None
     knot_header = None
     stitches: dict[int, dict[int, Node]] = {}
-    stitches_info = {}
+    stitches_info: dict[int, Node] = {}
     # more logical to put elements as header, knots
     # and in knot as header, stitches
     for k, node in lines.items():
         if node.node_type is NodeType.KNOT:
             knot_info[node.item_id] = node
-            if knot_header is not None:
+            if (knot_header is not None) or (len(stitches) > 0):
                 # finish the previous knot
                 previous_knot = RawKnot(
-                    header=knot_header, stitches=stitches, stitches_info=stitches_info
+                    header=knot_header if knot_header else {},
+                    stitches=stitches,
+                    stitches_info=stitches_info,
                 )
+                if last_knot is None:
+                    raise NotImplementedError("PARSING ERROR")
                 knots[last_knot] = previous_knot
                 knot_header = None  # type: ignore
                 stitches = {}
@@ -427,10 +442,14 @@ def clean_lines(ink_code: str, clean_text_sep=" ") -> RawStory:
                     new_node.parse_glue()
                     new_node.parse_instruction()
                     knot_header[new_node.item_id] = new_node
-    if knot_header is not None:
+    if (knot_header is not None) or (len(stitches) > 0):
         # finish the previous knot
         previous_knot = RawKnot(
-            header=knot_header, stitches=stitches, stitches_info=stitches_info
+            header=knot_header if knot_header else {},
+            stitches=stitches,
+            stitches_info=stitches_info,
         )
+        if last_knot is None:
+            raise NotImplementedError("PARSING ERROR")
         knots[last_knot] = previous_knot
     return RawStory(header=header, knots=knots, knots_info=knot_info)  # type: ignore

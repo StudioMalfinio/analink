@@ -1,20 +1,20 @@
 ```mermaid
 flowchart TD
-    2["We arrived into London at 9.45pm exactly."]
-    3{"'There is not a moment to lose!' I declared."}
-    7{"'Monsieur, let us savour this moment!' I declared. My master clouted me firmly around the head and dragged me out of the door."}
-    9{""}
-    11["We hurried home to Savile Row"]
-    13["He insisted that we hurried home to Savile Row"]
-    16[" as fast as we could."]
-    2 -->|&quot;There is not a moment to lose!&quot;| 3
-    3 --> 11
-    2 -->|&quot;Monsieur, let us savour this moment!&quot;| 7
-    7 --> 13
-    2 -->|We hurried home| 9
-    9 --> 11
-    11 --> 16
-    13 --> 16
-    -2 --> 2
-    16 --> -3
+    C["We arrived into London at 9.45pm exactly."]
+    D{"'There is not a moment to lose!' I declared."}
+    H{"'Monsieur, let us savour this moment!' I declared. My master clouted me firmly around the head and dragged me out of the door."}
+    J{"DEFAULT"}
+    L["We hurried home to Savile Row"]
+    N["He insisted that we hurried home to Savile Row"]
+    Q[" as fast as we could."]
+    C -->|&quot;There is not a moment to lose!&quot;| D
+    D --> L
+    C -->|&quot;Monsieur, let us savour this moment!&quot;| H
+    H --> N
+    C -->|We hurried home| J
+    J --> L
+    L --> Q
+    N --> Q
+    BEGIN --> C
+    Q --> AUTO_END
 ```

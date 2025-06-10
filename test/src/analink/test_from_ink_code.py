@@ -292,7 +292,7 @@ def test_parser_story_full(ink_code, expected_nodes, expected_mermaid):
             assert actual_nodes[k].choice_text == expected_nodes[k]["choice_text"]
 
     # When
-    actual_mermaid = graph_to_mermaid(actual_nodes, actual_edges)
+    actual_mermaid = graph_to_mermaid(actual_nodes, actual_edges, use_letter=False)
 
     assert actual_mermaid == expected_mermaid
 

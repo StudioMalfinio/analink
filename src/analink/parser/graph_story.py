@@ -179,9 +179,33 @@ def escape_mermaid_text(text: Optional[str]) -> str:
     return text
 
 
-def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> str:
+def excel_column_number_to_name(column_number: int):
+    if column_number == -1:
+        return "END"
+    if column_number == -2:
+        return "BEGIN"
+    if column_number == -3:
+        return "AUTO_END"
+    output = ""
+    index = column_number
+    while index >= 0:
+        character = chr((index % 26) + ord("A"))
+        output = output + character
+        index = index // 26 - 1
+
+    return output[::-1]
+
+
+def graph_to_mermaid(
+    nodes: dict[int, Node], edges: list[tuple[int, int]], use_letter: bool = True
+) -> str:
     """Convert nodes and edges to Mermaid flowchart"""
     lines = ["```mermaid", "flowchart TD"]
+
+    def transform_id(node_id: int):
+        if use_letter:
+            return excel_column_number_to_name(node_id)
+        return node_id
 
     added_edges = set()
 
@@ -192,10 +216,12 @@ def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> st
         content = node.content.replace('"', "'").replace("\n", " ")
         # if len(content) > 50:
         #     content = content[:47] + "..."
+        if len(content) == 0:
+            content = "DEFAULT"
         if node.node_type is NodeType.CHOICE:
-            lines.append(f'    {node_id}{{"{content}"}}')
+            lines.append(f'    {transform_id(node_id)}{{"{content}"}}')
         else:
-            lines.append(f'    {node_id}["{content}"]')
+            lines.append(f'    {transform_id(node_id)}["{content}"]')
 
     # Add all edges (avoid duplicates)
     for source, target in edges:
@@ -203,9 +229,11 @@ def graph_to_mermaid(nodes: dict[int, Node], edges: list[tuple[int, int]]) -> st
         if edge not in added_edges:
             if nodes[target].node_type is NodeType.CHOICE:
                 choice_text = escape_mermaid_text(nodes[target].choice_text)
-                lines.append(f"    {source} -->|{choice_text}| {target}")
+                lines.append(
+                    f"    {transform_id(source)} -->|{choice_text}| {transform_id(target)}"
+                )
             else:
-                lines.append(f"    {source} --> {target}")
+                lines.append(f"    {transform_id(source)} --> {transform_id(target)}")
             added_edges.add(edge)
 
     lines.append("```")

@@ -1,0 +1,14 @@
+```mermaid
+flowchart TD
+    B["Where do you want to travel"]
+    C{"DEFAULT"}
+    E{"DEFAULT"}
+    I["guard"]
+    K["first class"]
+    B -->|Travel in first class| C
+    C --> I
+    B -->|Travel in the guard&#39;s van| E
+    E --> I
+    BEGIN --> B
+    I --> AUTO_END
+```

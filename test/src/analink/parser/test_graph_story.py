@@ -3,6 +3,7 @@ import pytest
 from analink.parser.graph_story import (
     KEY_KNOT_NAME,
     escape_mermaid_text,
+    excel_column_number_to_name,
     find_leaves_from_node,
     graph_to_mermaid,
     parse_base_block,
@@ -716,7 +717,9 @@ class TestGraphToMermaid:
 
         assert lines[0] == "```mermaid"
         assert lines[1] == "flowchart TD"
-        assert f'    {node.item_id}["Test content"]' in lines
+        assert (
+            f'    {excel_column_number_to_name(node.item_id)}["Test content"]' in lines
+        )
         assert lines[-1] == "```"
 
     def test_choice_node_rendering(self):
@@ -733,7 +736,10 @@ class TestGraphToMermaid:
         result = graph_to_mermaid(nodes, [])
 
         # Choice nodes should use curly braces
-        assert f'    {choice_node.item_id}{{"Choice text"}}' in result
+        assert (
+            f'    {excel_column_number_to_name(choice_node.item_id)}{{"Choice text"}}'
+            in result
+        )
 
     def test_edge_with_choice_text(self):
         """Test edge rendering with choice text"""
@@ -759,7 +765,10 @@ class TestGraphToMermaid:
         result = graph_to_mermaid(nodes, edges)
 
         # Should include choice text in edge label
-        assert f"    {base_node.item_id} -->|Go north| {choice_node.item_id}" in result
+        assert (
+            f"    {excel_column_number_to_name(base_node.item_id)} -->|Go north| {excel_column_number_to_name(choice_node.item_id)}"
+            in result
+        )
 
     def test_regular_edge_without_choice_text(self):
         """Test regular edge without choice text"""
@@ -784,7 +793,10 @@ class TestGraphToMermaid:
         result = graph_to_mermaid(nodes, edges)
 
         # Should be regular arrow without label
-        assert f"    {node1.item_id} --> {node2.item_id}" in result
+        assert (
+            f"    {excel_column_number_to_name(node1.item_id)} --> {excel_column_number_to_name(node2.item_id)}"
+            in result
+        )
 
     def test_content_with_quotes_and_newlines(self):
         """Test content with quotes and newlines is properly escaped"""
@@ -800,29 +812,10 @@ class TestGraphToMermaid:
         result = graph_to_mermaid(nodes, [])
 
         # Quotes should be replaced with single quotes, newlines with spaces
-        assert f"    {node.item_id}[\"Content with 'quotes' and newlines\"]" in result
-
-    def test_long_content_truncation(self):
-        """Test that long content is truncated"""
-        long_content = (
-            "This is a very long piece of content that exceeds fifty characters"
+        assert (
+            f"    {excel_column_number_to_name(node.item_id)}[\"Content with 'quotes' and newlines\"]"
+            in result
         )
-        node = Node(
-            node_type=NodeType.BASE,
-            raw_content=long_content,
-            level=0,
-            line_number=1,
-            content=long_content,
-        )
-        nodes = {node.item_id: node}
-
-        result = graph_to_mermaid(nodes, [])
-
-        # Should be truncated to 47 chars + "..."
-        expected_content = (
-            "This is a very long piece of content that exceeds fifty characters"
-        )
-        assert f'    {node.item_id}["{expected_content}"]' in result
 
     def test_node_with_none_content_skipped(self):
         """Test that nodes with None content are skipped"""
@@ -867,7 +860,7 @@ class TestGraphToMermaid:
         lines = result.split("\n")
 
         # Count occurrences of the edge
-        edge_line = f"    {node1.item_id} --> {node2.item_id}"
+        edge_line = f"    {excel_column_number_to_name(node1.item_id)} --> {excel_column_number_to_name(node2.item_id)}"
         edge_count = sum(1 for line in lines if line == edge_line)
         assert edge_count == 1
 

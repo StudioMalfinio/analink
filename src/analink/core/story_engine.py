@@ -2,6 +2,7 @@
 Core story engine for managing interactive fiction state and flow.
 """
 
+from pathlib import Path
 from typing import Callable, List, Optional
 
 import networkx as nx
@@ -22,7 +23,9 @@ class StoryEngine:
     - Event callbacks for UI updates
     """
 
-    def __init__(self, story_text: str, typing_speed: float = 0.05):
+    def __init__(
+        self, story_text: str, typing_speed: float = 0.05, cwd: Optional[Path] = None
+    ):
         """
         Initialize the story engine.
 
@@ -34,7 +37,7 @@ class StoryEngine:
         self.typing_speed = typing_speed
 
         # Parse the story
-        self.raw_story = clean_lines(story_text)
+        self.raw_story = clean_lines(story_text, cwd=cwd)
         self.nodes, self.edges = parse_story(self.raw_story)
 
         # Story state
@@ -57,7 +60,7 @@ class StoryEngine:
         """Create a story engine from an ink file."""
         with open(filepath, "r", encoding="utf-8") as f:
             story_text = f.read()
-        return cls(story_text, **kwargs)
+        return cls(story_text, cwd=Path(filepath).parent.resolve(), **kwargs)
 
     def _fill_auto_end_node(self) -> None:
         # for all the node without children not being END then AUTO_END
