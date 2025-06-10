@@ -52,6 +52,9 @@ class StoryEngine:
         self.on_choices_updated: Optional[Callable[[List[Node]], None]] = None
         self.on_story_complete: Optional[Callable[[], None]] = None
 
+        self.node_visited: dict[int, int] = dict()
+        self.node_can_be_visited_again: dict[int, bool] = dict()
+
     def to_mermaid(self):
         return graph_to_mermaid(self.nodes, self.edges)
 
@@ -151,7 +154,7 @@ class StoryEngine:
             and choice_node.content.strip()
         ):
             self._add_content(choice_node.content)
-
+        self.node_can_be_visited_again[choice_node.item_id] = False
         # Follow the story path until we find new choices or reach the end
         self._follow_story_path()
 
@@ -165,7 +168,9 @@ class StoryEngine:
         visited = set()  # Prevent infinite loops
 
         while self.current_node_id not in visited:
-            visited.add(self.current_node_id)
+            if self.current_node_id not in self.node_visited:
+                self.node_visited[self.current_node_id] = 0
+            self.node_visited[self.current_node_id] += 1
 
             # Get next nodes
             next_node_ids = self._get_next_nodes(self.current_node_id)
@@ -193,7 +198,7 @@ class StoryEngine:
                 break
 
             # No choices found, continue following the path
-            # Move to the first next node
+            # Move to the first next node if we can see it multiple times
             next_node_id = next_node_ids[0]
             next_node = self.nodes.get(next_node_id)
 
@@ -211,18 +216,29 @@ class StoryEngine:
     def _get_next_nodes(self, node_id: int) -> List[int]:
         """Get the next nodes from the current node."""
         if node_id in self.graph:
-            return list(self.graph.successors(node_id))
+            possible_nodes = list(self.graph.successors(node_id))
+            return [
+                node_id
+                for node_id in possible_nodes
+                if self.node_can_be_visited_again.get(node_id, True)
+            ]
         return []
 
     def _get_choice_nodes(self, node_ids: List[int]) -> List[Node]:
         """Filter node IDs to return only choice nodes."""
         choice_nodes = []
+        choice_order = 1
         for node_id in node_ids:
             if (
                 node_id in self.nodes
                 and self.nodes[node_id].node_type == NodeType.CHOICE
             ):
-                choice_nodes.append(self.nodes[node_id])
+                if self.nodes[node_id].item_id not in self.node_visited:
+                    if self.nodes[node_id].choice_order is None:
+                        self.nodes[node_id].choice_order = choice_order
+                    choice_nodes.append(self.nodes[node_id])
+                choice_order += 1
+
         return choice_nodes
 
     def get_available_choices(self) -> List[Node]:

@@ -52,6 +52,7 @@ class Node(BaseModel):
     name: Optional[str] = None
     content: Optional[str] = None
     choice_text: Optional[str] = None
+    choice_order: Optional[int] = None
     glue_before: bool = False
     glue_after: bool = False
     instruction: Optional[str] = None

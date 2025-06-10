@@ -240,8 +240,10 @@ class InkStoryApp(App):
         choices_container.remove_children()
 
         if choices:
-            for i, choice_node in enumerate(choices, 1):
-                button = ChoiceButton(choice_node, i)
+            for choice_node in choices:
+                if choice_node.choice_order is None:
+                    raise NotImplementedError("PARSING ERROR")
+                button = ChoiceButton(choice_node, choice_node.choice_order)
                 choices_container.mount(button)
         else:
             # Show end message when no choices available
