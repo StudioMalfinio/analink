@@ -5,29 +5,7 @@ from typing import ClassVar, Optional
 
 from pydantic import BaseModel, PrivateAttr, computed_field
 
-
-def extract_parts(text):
-    # Use re.DOTALL flag to make . match newlines too
-    pattern = r"(.*)(?<!\\)\[([^\]]*)\](.*)"
-    bracket_pattern = r"(?<!\\)\[[^\]]*\]"
-    matches = re.findall(bracket_pattern, text, re.DOTALL)
-    if len(matches) > 1:
-        raise ValueError(f"Multiple bracket patterns found: {len(matches)} occurrences")
-    match = re.match(pattern, text, re.DOTALL)
-
-    if match:
-        before, inside, after = match.groups()
-
-        # Version 1: before + inside
-        version1 = before + inside
-
-        # Version 2: before + after
-        version2 = before + after
-
-        return version1, version2
-    else:
-        # No brackets found, return original text twice
-        return text, text
+from analink.parser.utils import count_leading_chars, extract_parts
 
 
 class NodeType(Enum):
@@ -77,6 +55,16 @@ class Node(BaseModel):
 
     @classmethod
     def begin_node(cls):
+        return cls(
+            node_type=NodeType.BEGIN,
+            raw_content="",
+            level=-1,
+            line_number=-1,
+            name="BEGIN",
+        )
+
+    @classmethod
+    def divert_node(cls):
         return cls(
             node_type=NodeType.BEGIN,
             raw_content="",
@@ -141,22 +129,6 @@ class Node(BaseModel):
             self.instruction = instruction
 
 
-def count_leading_chars(line: str, char: str) -> tuple[int, str]:
-    """Count leading characters (for nesting level) and return the text without the leading char"""
-    count = 0
-    idx = 0
-    for c in line:
-        if c == char:
-            count += 1
-            idx += 1
-        elif c == " " or c == "\t":
-            idx += 1
-            continue
-        else:
-            break
-    return count, line[idx:]
-
-
 def extract_knot_name(text):
     """Extract knot name between = markers"""
     # Match leading =, capture the middle part, ignore trailing =
@@ -166,23 +138,27 @@ def extract_knot_name(text):
     return text.strip()
 
 
-def parse_node(
-    line: str, line_number: int, last_level: int, in_comment: bool = False
-) -> tuple[Optional[Node], int]:
-    """Parse a single line of Ink code"""
+def parse_comment_or_empty(line: str, in_comment: bool = False) -> tuple[bool, bool]:
+    """Check if line is empty or a comment"""
     stripped = line.strip()
-    # Skip empty lines and comments
+    is_comment_or_empty = False
+    in_comment = False
     if not stripped or stripped.startswith("//"):
-        return None, last_level
+        is_comment_or_empty = True
     if stripped.startswith("/*"):
         in_comment = True
-        return None, last_level
-    if stripped.startswith("*/"):
-        in_comment = False
-        return None, last_level
-    if in_comment:
-        return None, last_level
-    # Skip special directives like -> END
+        is_comment_or_empty = True
+    elif stripped.startswith("*/"):
+        is_comment_or_empty = True
+    elif in_comment:
+        is_comment_or_empty = True
+    return is_comment_or_empty, in_comment
+
+
+def parse_divert(
+    line: str, last_level: int, line_number: int
+) -> tuple[Optional[Node], int]:
+    stripped = line.strip()
     if stripped.startswith("->"):
         return (
             Node(
@@ -194,7 +170,11 @@ def parse_node(
             ),
             last_level,
         )
-    # Check for choices (stars) and gathers (dashes) in the stripped line
+    return None, last_level
+
+
+def parse_knot_and_stitches(line: str, last_level: int, line_number: int):
+    stripped = line.strip()
     if stripped.startswith("=="):
         knot_name = extract_knot_name(stripped)
         return (
@@ -207,8 +187,6 @@ def parse_node(
             ),
             0,
         )
-
-        # this is a knot
     if stripped.startswith("="):
         stitches_name = extract_knot_name(stripped)
         return (
@@ -221,7 +199,29 @@ def parse_node(
             ),
             0,
         )
-        # this is a stitches since this is not a node
+    return None, last_level
+
+
+def parse_node(
+    line: str, line_number: int, last_level: int, in_comment: bool = False
+) -> tuple[Optional[Node], int]:
+    """Parse a single line of Ink code"""
+    stripped = line.strip()
+    # Skip empty lines and comments
+    is_comment_or_empty, in_comment = parse_comment_or_empty(line, in_comment)
+    if is_comment_or_empty:
+        return None, last_level
+    # Skip special directives like -> END
+    divert_node, last_level = parse_divert(line, last_level, line_number)
+    if divert_node is not None:
+        return divert_node, last_level
+
+    knot_or_stitches_node, last_level = parse_knot_and_stitches(
+        line, last_level, line_number
+    )
+    if knot_or_stitches_node is not None:
+        return knot_or_stitches_node, last_level
+
     choice_count, text_choice = count_leading_chars(stripped, "*")
     gather_count, text_gather = count_leading_chars(stripped, "-")
     if choice_count > 0:
