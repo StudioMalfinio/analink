@@ -1,5 +1,6 @@
 """
 Textual-based user interface for interactive fiction stories.
+Logic separated from styling.
 """
 
 from typing import List
@@ -10,6 +11,9 @@ from textual.widgets import Button, Static
 
 from analink.core.story_engine import StoryEngine
 from analink.parser.node import Node
+from analink.ui.styles import (  # , CYBERPUNK_CSS, VINTAGE_TERMINAL_CSS, FANTASY_SCROLL_CSS
+    APP_CSS,
+)
 
 
 class ChoiceButton(Button):
@@ -35,80 +39,7 @@ class InkStoryApp(App):
     - Quit functionality
     """
 
-    CSS = """
-    Screen {
-        background: $surface;
-    }
-    
-    Container {
-        height: 100%;
-        width: 100%;
-        padding: 1;
-    }
-    
-    #story-container {
-        height: 60%;
-        border: thick $primary;
-        border-title-color: $primary;
-        border-title-background: $surface;
-        border-title-style: bold;
-        padding: 1;
-        margin-bottom: 1;
-        background: $surface-darken-1;
-    }
-    
-    #story-text {
-        height: 100%;
-        color: $text;
-        scrollbar-size: 1 1;
-    }
-    
-    #choices {
-        height: 30%;
-        border: thick $secondary;
-        border-title-color: $secondary;
-        border-title-background: $surface;
-        border-title-style: bold;
-        padding: 1;
-        background: $surface-darken-2;
-    }
-    
-    ChoiceButton {
-        width: 100%;
-        height: 3;
-        margin: 1 0;
-        border: solid $accent;
-        background: $accent-darken-2;
-        color: $text;
-    }
-    
-    ChoiceButton:hover {
-        background: $accent;
-        border: solid $accent-lighten-1;
-        color: $text-muted;
-        text-style: bold;
-    }
-    
-    ChoiceButton:focus {
-        background: $accent-lighten-1;
-        border: solid $warning;
-        color: $surface;
-        text-style: bold;
-    }
-    
-    .end-message {
-        text-align: center;
-        padding: 1;
-        color: $warning;
-    }
-    
-    #quit-button {
-        height: 3;
-        width: 20;
-        margin: 1;
-        dock: bottom;
-    }
-    """
+    CSS = APP_CSS
 
     def __init__(self, story_engine: StoryEngine):
         """
@@ -174,7 +105,7 @@ class InkStoryApp(App):
         if self._next_content_glued:
             block_separator = ""
             self._next_content_glued = False
-        # content+=f" PRINT : {current_node.glue_before, current_node.content}"
+
         # Queue the content for typing
         formatted_content = self._format_content(content)
         self.pending_new_content.append((block_separator, formatted_content))
