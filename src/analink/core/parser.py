@@ -22,6 +22,10 @@ class RawStoryBuilder:
         self.current_stitches_info: dict[int, Node] = {}
         self.current_stitches_id: Optional[int] = None
 
+        # Context tracking
+        self.current_knot_name: str = "HEADER"
+        self.current_stitch_name: str = "HEADER"
+
     def finalize_current_knot(self) -> None:
         """Finalize the current knot and add it to the knots collection"""
         if self.current_knot_id is not None and (
@@ -45,15 +49,20 @@ class RawStoryBuilder:
         self.finalize_current_knot()
         self.knots_info[node.item_id] = node
         self.current_knot_id = node.item_id
+        self.current_knot_name = node.name or "HEADER"  # Add this line
+        self.current_stitch_name = "HEADER"  # Reset stitch context
 
     def start_new_stitches(self, node: Node) -> None:
         """Start a new stitches section"""
         self.current_stitches_info[node.item_id] = node
         self.current_stitches[node.item_id] = {}
         self.current_stitches_id = node.item_id
+        self.current_stitch_name = node.name or "HEADER"  # Add this line
 
     def add_content_node(self, node: Node, divert_node: Optional[Node] = None) -> None:
         """Add a content node to the appropriate section"""
+        node.knot_name = self.current_knot_name
+        node.stitch_name = self.current_stitch_name
         if self.current_knot_id is None:
             # Add to story header
             self.header[node.item_id] = node
@@ -80,7 +89,11 @@ class RawStoryBuilder:
         """Process a single node and add it to the appropriate section"""
         if node.node_type == NodeType.KNOT:
             self.start_new_knot(node)
+            node.knot_name = node.name or "HEADER"  # Set its own knot name
+            node.stitch_name = "HEADER"
         elif node.node_type == NodeType.STITCHES:
+            node.knot_name = self.current_knot_name  # Inherit current knot
+            node.stitch_name = node.name or "HEADER"  # Set its own stitch name
             self.start_new_stitches(node)
         else:
             # Process content nodes (BASE, CHOICE, GATHER, DIVERT)

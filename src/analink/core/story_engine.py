@@ -3,15 +3,17 @@ Core story engine for managing interactive fiction state and flow.
 """
 
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 import networkx as nx
 
+from analink.core.condition import Condition
 from analink.core.parser import Node, NodeType, clean_lines
+from analink.core.status import ContainerState, ContainerStateProvider, ContainerStatus
 from analink.parser.graph_story import graph_to_mermaid, parse_story
 
 
-class StoryEngine:
+class StoryEngine(ContainerStateProvider):
     """
     Core engine for managing interactive fiction story state, flow, and logic.
 
@@ -24,7 +26,11 @@ class StoryEngine:
     """
 
     def __init__(
-        self, story_text: str, typing_speed: float = 0.05, cwd: Optional[Path] = None
+        self,
+        story_text: str,
+        let_people_choose_one_choice: bool = True,
+        typing_speed: float = 0.05,
+        cwd: Optional[Path] = None,
     ):
         """
         Initialize the story engine.
@@ -35,6 +41,7 @@ class StoryEngine:
         """
         Node.reset_id_counter()
         self.typing_speed = typing_speed
+        self.let_people_choose_one_choice = let_people_choose_one_choice
 
         # Parse the story
         self.raw_story = clean_lines(story_text, cwd=cwd)
@@ -54,6 +61,52 @@ class StoryEngine:
 
         self.node_visited: dict[int, int] = dict()
         self.node_can_be_visited_again: dict[int, bool] = dict()
+
+        # State tracking
+        self.container_states: dict[str, ContainerState] = {}
+        self.game_variables: dict[str, Any] = {}
+        self.current_turn: int = 0
+
+        # Initialize container states for all knots and stitches
+        self._initialize_container_states()
+
+    def get_container_state(
+        self, container_reference: Optional[str]
+    ) -> Optional[ContainerState]:
+        """Get container state by reference"""
+        if container_reference is None:
+            raise AttributeError("Need to give a container reference when querying it")
+        return self.container_states.get(container_reference)
+
+    def get_game_variables(self) -> dict[str, Any]:
+        """Get current game variables"""
+        return self.game_variables
+
+    def get_current_turn(self) -> int:
+        """Get current turn number"""
+        return self.current_turn
+
+    def _evaluate_condition(self, condition: Optional[Condition]) -> bool:
+        """Evaluate a condition using the provider pattern"""
+        if not condition:
+            return True
+
+        return condition.evaluate(self)  # Pass self as the provider
+
+    def _initialize_container_states(self) -> None:
+        """Initialize container states for all knots and stitches"""
+        # Initialize states for all knots
+        for node_id, node in self.nodes.items():
+            if hasattr(node, "knot_name") and node.knot_name != "HEADER":
+                knot_key = node.knot_name
+                if knot_key not in self.container_states:
+                    self.container_states[knot_key] = ContainerState()
+
+                # Initialize states for stitches
+                if hasattr(node, "stitch_name") and node.stitch_name != "HEADER":
+                    stitch_key = f"{node.knot_name}.{node.stitch_name}"
+                    if stitch_key not in self.container_states:
+                        self.container_states[stitch_key] = ContainerState()
 
     def to_mermaid(self):
         return graph_to_mermaid(self.nodes, self.edges)
@@ -154,7 +207,8 @@ class StoryEngine:
             and choice_node.content.strip()
         ):
             self._add_content(choice_node.content)
-        self.node_can_be_visited_again[choice_node.item_id] = False
+        if not choice_node.is_sticky:
+            self.node_can_be_visited_again[choice_node.item_id] = False
         # Follow the story path until we find new choices or reach the end
         self._follow_story_path()
 
@@ -162,6 +216,34 @@ class StoryEngine:
         self._notify_choices_updated()
 
         return True
+
+    def _update_container_states_for_node(self, node_id: int) -> None:
+        """Update container states when visiting a node"""
+        node = self.nodes.get(node_id)
+        if not node:
+            return
+
+        # Update knot state
+        if hasattr(node, "knot_name") and node.knot_name != "HEADER":
+            knot_key = node.knot_name
+            if knot_key in self.container_states:
+                state = self.container_states[knot_key]
+                state.seen_count += 1
+                state.last_seen_turn = self.current_turn
+                state.status = ContainerStatus.SEEN
+
+        # Update stitch state
+        if (
+            hasattr(node, "stitch_name")
+            and node.stitch_name != "HEADER"
+            and hasattr(node, "knot_name")
+        ):
+            stitch_key = f"{node.knot_name}.{node.stitch_name}"
+            if stitch_key in self.container_states:
+                state = self.container_states[stitch_key]
+                state.seen_count += 1
+                state.last_seen_turn = self.current_turn
+                state.status = ContainerStatus.SEEN
 
     def _follow_story_path(self):
         """Follow the story path, processing gather nodes and base content until we find choices or reach the end."""
@@ -171,7 +253,7 @@ class StoryEngine:
             if self.current_node_id not in self.node_visited:
                 self.node_visited[self.current_node_id] = 0
             self.node_visited[self.current_node_id] += 1
-
+            self._update_container_states_for_node(self.current_node_id)
             # Get next nodes
             next_node_ids = self._get_next_nodes(self.current_node_id)
 
@@ -193,13 +275,20 @@ class StoryEngine:
             # Check if any next nodes are choices
             choice_nodes = self._get_choice_nodes(next_node_ids)
 
-            if choice_nodes:
+            if (choice_nodes and self.let_people_choose_one_choice) or (
+                len(choice_nodes) > 1 and not self.let_people_choose_one_choice
+            ):
                 # Found choices, stop here so user can choose
                 break
 
             # No choices found, continue following the path
             # Move to the first next node if we can see it multiple times
-            next_node_id = next_node_ids[0]
+            if not self.let_people_choose_one_choice:
+                next_node_id = (
+                    choice_nodes[0].item_id if choice_nodes else next_node_ids[0]
+                )
+            else:
+                next_node_id = next_node_ids[0]
             next_node = self.nodes.get(next_node_id)
 
             if next_node:
@@ -208,6 +297,12 @@ class StoryEngine:
                 if next_node.node_type == NodeType.GATHER and next_node.content:
                     self._add_content(next_node.content)
                 elif next_node.node_type == NodeType.BASE and next_node.content:
+                    self._add_content(next_node.content)
+                elif (
+                    next_node.node_type == NodeType.CHOICE
+                    and next_node.content
+                    and not self.let_people_choose_one_choice
+                ):
                     self._add_content(next_node.content)
             else:
                 # Move to this node
@@ -227,19 +322,27 @@ class StoryEngine:
     def _get_choice_nodes(self, node_ids: List[int]) -> List[Node]:
         """Filter node IDs to return only choice nodes."""
         choice_nodes = []
+        fallback_choice = []
         choice_order = 1
         for node_id in node_ids:
             if (
                 node_id in self.nodes
                 and self.nodes[node_id].node_type == NodeType.CHOICE
             ):
-                if self.nodes[node_id].item_id not in self.node_visited:
-                    if self.nodes[node_id].choice_order is None:
-                        self.nodes[node_id].choice_order = choice_order
-                    choice_nodes.append(self.nodes[node_id])
+                node = self.nodes[node_id]
+                if node.is_sticky or node_id not in self.node_visited:
+                    if node.choice_order is None:
+                        node.choice_order = choice_order
+                    if node.is_fallback:
+                        fallback_choice.append(node)
+                    else:
+                        if not self._evaluate_condition(node.condition):
+                            choice_order += 1
+                            continue
+                        choice_nodes.append(node)
                 choice_order += 1
 
-        return choice_nodes
+        return choice_nodes if choice_nodes else fallback_choice
 
     def get_available_choices(self) -> List[Node]:
         """Get the currently available choice nodes."""

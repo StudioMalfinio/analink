@@ -1,7 +1,70 @@
+import re
 from typing import Optional
 
+from analink.core.condition import Condition, ConditionType, UnaryCondition
 from analink.core.models import Node, NodeType
 from analink.parser.utils import count_leading_chars, extract_knot_name
+
+
+def parse_condition_string(condition_str: str) -> Optional[Condition]:
+    """Parse an Ink condition string like 'not visit_paris' into a Condition object"""
+    if not condition_str or not condition_str.strip():
+        return None
+
+    condition_str = condition_str.strip()
+
+    # Handle "not knot_name" - should check if seen count == 0
+    if condition_str.startswith("not "):
+        knot_name = condition_str[4:].strip()
+        return UnaryCondition(
+            condition_type=ConditionType.SEEN_COUNT_EQ,
+            container_reference=knot_name,
+            expected_value=0,
+        )
+
+    # Handle "knot_name > 3"
+    gt_match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_.]*)\s*>\s*(\d+)$", condition_str)
+    if gt_match:
+        knot_name, count = gt_match.groups()
+        return UnaryCondition(
+            condition_type=ConditionType.SEEN_COUNT_GT,
+            container_reference=knot_name,
+            expected_value=int(count),
+        )
+
+    # Handle "knot_name < 3"
+    lt_match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_.]*)\s*<\s*(\d+)$", condition_str)
+    if lt_match:
+        knot_name, count = lt_match.groups()
+        return UnaryCondition(
+            condition_type=ConditionType.SEEN_COUNT_LT,
+            container_reference=knot_name,
+            expected_value=int(count),
+        )
+
+    # Handle plain "knot_name" - should check if seen count > 0
+    if re.match(r"^[a-zA-Z_][a-zA-Z0-9_.]*$", condition_str):
+        return UnaryCondition(
+            condition_type=ConditionType.SEEN_COUNT_GT,
+            container_reference=condition_str,
+            expected_value=0,
+        )
+
+    return None
+
+
+def extract_condition_from_line(line: str) -> tuple[str, Optional[Condition]]:
+    """Extract condition from line and return cleaned line + condition"""
+    condition_match = re.search(r"\{([^}]+)\}", line)
+    condition = None
+
+    if condition_match:
+        condition_str = condition_match.group(1).strip()
+        condition = parse_condition_string(condition_str)
+        # Remove condition from line
+        line = line.replace(condition_match.group(0), "").strip()
+
+    return line, condition
 
 
 class InkLineParser:
@@ -37,12 +100,13 @@ class InkLineParser:
         """Parse divert lines (starting with ->)"""
         stripped = line.strip()
         if stripped.startswith("->"):
+            divert_name = stripped.split("->")[-1].strip()
             return Node(
                 level=last_level,
                 node_type=NodeType.DIVERT,
                 raw_content=line,
                 line_number=line_number,
-                name=stripped.split("->")[-1].strip(),
+                name=divert_name,
             )
         return None
 
@@ -75,6 +139,23 @@ class InkLineParser:
         """Parse choice (*) or gather (-) lines"""
         stripped = line.strip()
 
+        # Extract condition first (before counting leading chars)
+        stripped, condition = extract_condition_from_line(stripped)
+
+        sticky_choice_count, text_choice = count_leading_chars(stripped, "+")
+        if sticky_choice_count > 0:
+            return (
+                Node(
+                    level=sticky_choice_count,
+                    node_type=NodeType.CHOICE,
+                    content=text_choice,
+                    raw_content=line,
+                    line_number=line_number,
+                    is_sticky=True,
+                    condition=condition,
+                ),
+                sticky_choice_count,
+            )
         choice_count, text_choice = count_leading_chars(stripped, "*")
         if choice_count > 0:
             return (
@@ -84,6 +165,7 @@ class InkLineParser:
                     content=text_choice,
                     raw_content=line,
                     line_number=line_number,
+                    condition=condition,
                 ),
                 choice_count,
             )
@@ -97,6 +179,7 @@ class InkLineParser:
                     content=text_gather,
                     raw_content=line,
                     line_number=line_number,
+                    condition=condition,
                 ),
                 gather_count,
             )
@@ -173,6 +256,9 @@ class LineMerger:
             content=previous_node.content + self.clean_text_sep + node.content,
             raw_content=previous_node.raw_content + "\n" + node.raw_content,
             line_number=previous_node.line_number,
+            condition=(
+                previous_node.condition if previous_node.condition else node.condition
+            ),
         )
 
         # Remove the previous node and update tracking

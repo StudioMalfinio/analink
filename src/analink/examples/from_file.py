@@ -9,7 +9,7 @@ DATA_DIR = (
     / "documentation_data"
 )
 
-file_name = "022.ink"
+file_name = "025.ink"
 run_story_from_file(
     str(DATA_DIR / file_name),
     typing_speed=0.01,

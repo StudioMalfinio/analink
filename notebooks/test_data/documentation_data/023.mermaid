@@ -1,0 +1,14 @@
+```mermaid
+flowchart TD
+    D["You search desperately for a friendly face in the crowd."]
+    E{"The woman in the hat pushes you roughly aside."}
+    F{"The man with the briefcase looks disgusted as you stumble past him."}
+    I{" But it is too late: you collapse onto the station platform. This is the end."}
+    BEGIN --> D
+    D -->|The woman in the hat?| E
+    E --> D
+    D -->|The man with the briefcase?| F
+    F --> D
+    D -->| But it is too late: you collapse onto the station platform. This is the end.| I
+    I --> END
+```

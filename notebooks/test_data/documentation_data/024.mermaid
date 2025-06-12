@@ -1,0 +1,23 @@
+```mermaid
+flowchart TD
+    D["You're in a cozy coffee shop. What would you like to do?"]
+    E{"DEFAULT"}
+    F{"DEFAULT"}
+    G{"DEFAULT"}
+    H{"DEFAULT"}
+    J["You order a delicious latte. The barista smiles at you."]
+    M["You see comfortable chairs, warm lighting, and other customers reading books. It's quite peaceful."]
+    P["You glance at your phone. No new messages, but you notice it's getting late."]
+    BEGIN --> D
+    D -->|Order a coffee| E
+    E --> J
+    D -->|Look around the shop| F
+    F --> M
+    D -->|Check your phone| G
+    G --> P
+    D -->|Leave the shop| H
+    H --> END
+    J --> D
+    M --> D
+    P --> D
+```

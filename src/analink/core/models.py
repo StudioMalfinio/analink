@@ -5,6 +5,7 @@ from typing import ClassVar, Optional
 
 from pydantic import BaseModel, PrivateAttr, computed_field
 
+from analink.core.condition import Condition
 from analink.parser.utils import extract_parts
 
 
@@ -34,6 +35,11 @@ class Node(BaseModel):
     glue_before: bool = False
     glue_after: bool = False
     instruction: Optional[str] = None
+    is_fallback: bool = False
+    knot_name: str = "HEADER"
+    stitch_name: str = "HEADER"
+    is_sticky: bool = False
+    condition: Optional[Condition] = None
 
     _next_id: ClassVar[int] = 1
 
@@ -88,6 +94,10 @@ class Node(BaseModel):
 
     def parse_divert(self) -> Optional["Node"]:
         if self.content is not None:
+            if self.content.strip().startswith("->"):
+                self.is_fallback = True
+                self.content = self.content.replace("->", "")
+                return None
             if "->" in self.content:
                 new_content, divert_target = self.content.split("->")
                 self.content = new_content.strip()
